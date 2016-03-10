@@ -24,6 +24,7 @@
 #include <dfu.h>
 #include <libintl.h>
 #include <locale.h>
+#include <math.h>
 #include <stdlib.h>
 #include <glib/gi18n.h>
 #include <glib-unix.h>
@@ -419,6 +420,79 @@ dfu_tool_set_release (DfuToolPrivate *priv, gchar **values, GError **error)
 					file,
 					priv->cancellable,
 					error);
+}
+
+/**
+ * dfu_tool_to_image:
+ **/
+static gboolean
+dfu_tool_to_image (DfuToolPrivate *priv, gchar **values, GError **error)
+{
+	gsize len;
+	guint width;
+	guint height;
+	guint i;
+	guint j;
+	g_autofree guint8 *data = NULL;
+	g_autoptr(GString) str = NULL;
+
+	/* check args */
+	if (g_strv_length (values) != 3) {
+		g_set_error_literal (error,
+				     DFU_ERROR,
+				     DFU_ERROR_INTERNAL,
+				     "Invalid arguments, expected FORMAT FILE-BIN FILE-IMG"
+				     " -- e.g. pgm `firmware.dfu firmware.pgm");
+		return FALSE;
+	}
+
+	/* get data */
+	if (!g_file_get_contents (values[1], (gchar**) &data, &len, error))
+		return FALSE;
+	if (len == 0) {
+		g_set_error_literal (error,
+				     DFU_ERROR,
+				     DFU_ERROR_INTERNAL,
+				     "zero length file");
+		return FALSE;
+	}
+
+	/* find optimal width */
+	width = sqrt (len);
+	for (i = 16; i > 2; i--) {
+		guint32 mask = (guint32) 1 << i;
+		if (width & mask)
+			break;
+	}
+	width = (guint32) 1 << (i + 1);
+
+	/* convert to PGM */
+	if (g_strcmp0 (values[0], "pgm") == 0) {
+		str = g_string_new ("P2\n");
+		height = (guint) len / width;
+		if (len % width > 0)
+			height++;
+		g_string_append_printf (str, "%i %i\n", width, height);
+		g_string_append_printf (str, "%i\n", 255);
+		for (i = 0; i < len; i += width) {
+			for (j = 0; j < width; j++) {
+				guint tmp = 0xff;
+				if (i + j < len)
+					tmp = data[i+j];
+				g_string_append_printf (str, "%03u ", tmp);
+			}
+			g_string_append (str, "\n");
+		}
+	} else {
+		g_set_error_literal (error,
+				     DFU_ERROR,
+				     DFU_ERROR_INTERNAL,
+				     "Invalid format, expected 'pgm'");
+		return FALSE;
+	}
+
+	/* save to disk */
+	return g_file_set_contents (values[2], str->str, -1, error);
 }
 
 /**
@@ -2161,6 +2235,12 @@ main (int argc, char *argv[])
 		     /* TRANSLATORS: command description */
 		     _("Sets metadata on a firmware file"),
 		     dfu_tool_set_metadata);
+	dfu_tool_add (priv->cmd_array,
+		     "to-image",
+		     NULL,
+		     /* TRANSLATORS: command description */
+		     _("Converts a firmware file to an image"),
+		     dfu_tool_to_image);
 
 	/* do stuff on ctrl+c */
 	priv->cancellable = g_cancellable_new ();
