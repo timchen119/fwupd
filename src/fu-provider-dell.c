@@ -24,15 +24,15 @@
 #include <fwupd.h>
 #include <fwup.h>
 #include <glib-object.h>
-
+#include <gusb.h>
 #include <appstream-glib.h>
 #include <glib/gstdio.h>
-
 #include <smbios_c/smbios.h>
 #include <smbios_c/smi.h>
+#include <smbios_c/obj/smi.h>
 #include <unistd.h>
 #include <fcntl.h>
-
+#include "fu-quirks.h"
 #include "fu-device.h"
 #include "fu-provider-dell.h"
 
@@ -56,7 +56,22 @@ static void	fu_provider_dell_finalize	(GObject	*object);
  *				    0x06E5, 0x06D9, 0x06DA, 0x06E4, 0x0704};
  */
 
-G_DEFINE_TYPE (FuProviderDell, fu_provider_dell, FU_TYPE_PROVIDER)
+ /**
+  * FuProviderDellPrivate:
+  **/
+typedef struct {
+	GHashTable		*devices;	/* DeviceKey:FuProviderDellDockItem */
+	GUsbContext		*usb_ctx;
+} FuProviderDellPrivate;
+
+typedef struct {
+	FuDevice		*device;
+	FuProviderDell		*provider_dell;
+	GUsbDevice		*usb_device;
+} FuProviderDellDockItem;
+
+G_DEFINE_TYPE_WITH_PRIVATE (FuProviderDell, fu_provider_dell, FU_TYPE_PROVIDER)
+#define GET_PRIVATE(o) (fu_provider_dell_get_instance_private (o))
 
 /**
  * fu_provider_dell_get_name:
@@ -64,7 +79,280 @@ G_DEFINE_TYPE (FuProviderDell, fu_provider_dell, FU_TYPE_PROVIDER)
 static const gchar *
 fu_provider_dell_get_name (FuProvider *provider)
 {
-	return "DELL";
+	return "Dell";
+}
+
+/**
+ * fu_provider_dell_detect_dock:
+ **/
+static gboolean
+fu_provider_dell_detect_dock (guint32 *location)
+{
+	g_autofree struct dock_count_in *count_args;
+	g_autofree struct dock_count_out *count_out;
+	guint ret;
+
+	/* Look up dock count */
+	count_args = g_malloc0(sizeof(struct dock_count_in));
+	count_out  = g_malloc0(sizeof(struct dock_count_out));
+	count_args->argument = DACI_DOCK_ARG_COUNT;
+	ret = dell_simple_ci_smi(DACI_DOCK_CLASS,
+				 DACI_DOCK_SELECT,
+				 (guint32 *) count_args,
+				 (guint32 *) count_out);
+	if (ret || count_out->ret != 0) {
+		g_debug("DELL: Failed to query system for dock count: "
+			"(%d) (%d)", ret, count_out->ret);
+		return FALSE;
+	}
+	if (count_out->count < 1) {
+		g_debug("DELL: no dock plugged in");
+		return FALSE;
+	}
+	*location = count_out->location;
+	g_debug("DELL: Dock count %u, location %u.",
+		count_out->count, *location);
+	return TRUE;
+
+}
+
+/**
+ * fu_provider_dell_device_free:
+ * Used for clearing an item created by a dock.
+ **/
+static void
+fu_provider_dell_device_free (FuProviderDellDockItem *item)
+{
+	g_object_unref (item->device);
+	g_object_unref (item->provider_dell);
+	g_object_unref (item->usb_device);
+}
+
+/**
+ * fu_provider_dell_get_version_format:
+ **/
+static AsVersionParseFlag
+fu_provider_dell_get_version_format (void)
+{
+        guint i;
+        g_autofree gchar *content = NULL;
+        /* any vendors match */
+        if (!g_file_get_contents ("/sys/class/dmi/id/sys_vendor",
+                                  &content, NULL, NULL))
+                return AS_VERSION_PARSE_FLAG_USE_TRIPLET;
+        g_strchomp (content);
+        for (i = 0; quirk_table[i].sys_vendor != NULL; i++) {
+                if (g_strcmp0 (content, quirk_table[i].sys_vendor) == 0)
+                        return quirk_table[i].flags;
+        }
+
+        /* fall back */
+        return AS_VERSION_PARSE_FLAG_USE_TRIPLET;
+}
+
+/**
+ * fu_provider_dell_get_dock_key:
+ **/
+static gchar *
+fu_provider_dell_get_dock_key (GUsbDevice *device, const gchar *guid)
+{
+	return g_strdup_printf ("%s_%s",
+				g_usb_device_get_platform_id (device),
+				guid);
+}
+
+/**
+ * fu_provider_dell_device_added_cb:
+ **/
+static void
+fu_provider_dell_device_added_cb (GUsbContext *ctx,
+				  GUsbDevice *device,
+				  FuProviderDell *provider_dell)
+{
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
+	FuProviderDellDockItem *item;
+	AsVersionParseFlag parse_flags;
+	guint16 pid;
+	guint16 vid;
+	g_autofree gchar *fw_version_str = NULL;
+	g_autofree gchar *dock_key = NULL;
+	g_autofree gchar *dock_id = NULL;
+	g_autofree gchar *dock_name = NULL;
+	const gchar *dock_guid;
+	const gchar *dock_type = "";
+	INFO_UNION buf;
+	DOCK_INFO *dock_info;
+	guint buf_size;
+	struct dell_smi_obj *smi;
+	gint result;
+	gint i;
+	guint ret;
+	guint32 location;
+
+
+	/* Don't look up immediately if a dock is connected as that would
+	   mean a SMI on every USB device that showed up on the system */
+
+	vid = g_usb_device_get_vid(device);
+	pid = g_usb_device_get_pid(device);
+
+	/* we're going to match on the Realtek NIC in the dock */
+	if (!(vid == 0x0bda && pid == 0x8153))
+		return;
+
+	if (!fu_provider_dell_detect_dock(&location))
+		return;
+
+	/* Look up more information on dock */
+	smi = dell_smi_factory(DELL_SMI_DEFAULTS);
+	if (!smi) {
+		g_debug("DELL: failure initializing SMI");
+		return;
+	}
+	dell_smi_obj_set_class(smi, DACI_DOCK_CLASS);
+	dell_smi_obj_set_select(smi, DACI_DOCK_SELECT);
+	dell_smi_obj_set_arg(smi, cbARG1, DACI_DOCK_ARG_INFO);
+	dell_smi_obj_set_arg(smi, cbARG2, location);
+	buf_size = sizeof(DOCK_INFO_RECORD);
+	buf.buf = dell_smi_obj_make_buffer_frombios_auto(smi, cbARG3, buf_size);
+	if (!buf.buf) {
+		g_debug("DELL: failed to initialize buffer");
+		dell_smi_obj_free(smi);
+		return;
+	}
+	ret = dell_smi_obj_execute(smi);
+	if (ret != 0) {
+		g_debug("DELL: SMI execution failed");
+		dell_smi_obj_free(smi);
+		return;
+	}
+	result = dell_smi_obj_get_res(smi, cbARG1);
+	if (result != 0) {
+		if (result == -6)
+			g_debug("DELL: Invalid buffer size, sent %d, needed %d",
+				buf_size,
+				dell_smi_obj_get_res(smi, cbARG2));
+		else
+			g_debug("DELL: SMI execution returned error: %d",
+				result);
+		dell_smi_obj_free(smi);
+		return;
+	}
+
+	if (buf.record->dock_info_header.dir_version != 1) {
+		dell_smi_obj_free(smi);
+		g_debug("DELL: Dock info header version unknown: %d",
+			buf.record->dock_info_header.dir_version);
+		return;
+	}
+	switch (buf.record->dock_info_header.dock_type) {
+		case DOCK_TYPE_TB15:
+			dock_type = "TB15";
+			break;
+		case DOCK_TYPE_WD15:
+			dock_type = "WD15";
+			break;
+		default:
+			g_debug("DELL: Dock type %d unknown",
+				buf.record->dock_info_header.dock_type);
+	}
+
+	dock_info = &buf.record->dock_info;
+	g_debug("DELL: dock description: %s", dock_info->dock_description);
+	/* Note: fw package version is deprecated, look at components instead */
+	g_debug("DELL: dock flash pkg ver: 0x%x", dock_info->flash_pkg_version);
+	g_debug("DELL: dock cable type: %d", dock_info->cable_type);
+	g_debug("DELL: dock location: %d", dock_info->location);
+	g_debug("DELL: dock component count: %d", dock_info->component_count);
+
+	for (i = 0; i < dock_info->component_count; i++) {
+		if (i > MAX_COMPONENTS) {
+			g_debug("DELL: Too many components.  Invalid: #%d", i);
+			break;
+		}
+		g_debug("DELL: dock component %d: %s (version 0x%x)", i,
+			dock_info->components[i].description,
+			dock_info->components[i].fw_version);
+	}
+
+	/* Dock EC hasn't been updated yet */
+	if (dock_info->flash_pkg_version == 0x00ffffff)
+		dock_info->flash_pkg_version = 0;
+
+	/* FIXME, if Dock EC version is valid, need to actually create devices
+	 * for all of the child components (EC, PC's, CBL, etc) that can be
+	 * queried as a group to evaluate the updatability of the dock */
+
+	/* FIXME: use correct GUID's for TB15, WD15 docks as lookup */
+	dock_guid = as_utils_guid_from_string(dock_type);
+	dock_key = fu_provider_dell_get_dock_key(device, dock_guid);
+	item = g_hash_table_lookup(priv->devices, dock_key);
+	if (item != NULL) {
+		g_debug("DELL: Item %s is already registered.", dock_key);
+		return;
+	}
+
+	item = g_new0(FuProviderDellDockItem, 1);
+	item->provider_dell = g_object_ref(provider_dell);
+	item->usb_device = g_object_ref(device);
+	item->device = fu_device_new();
+	dock_id = g_strdup_printf ("DELL-%s" G_GUINT64_FORMAT, dock_guid);
+	dock_name = g_strdup_printf("Dell %s dock", dock_type);
+	fu_device_set_id(item->device, dock_id);
+	fu_device_set_name(item->device, dock_name);
+	fu_device_add_guid (item->device, dock_guid);
+	fu_device_add_flag(item->device, FU_DEVICE_FLAG_REQUIRE_AC);
+	/* FIXME: add support for marking offline update on this */
+	parse_flags = fu_provider_dell_get_version_format();
+	fw_version_str = as_utils_version_from_uint32 (dock_info->flash_pkg_version,
+						       parse_flags);
+	fu_device_set_version(item->device, fw_version_str);
+	g_hash_table_insert (priv->devices, g_strdup (dock_key), item);
+
+	fu_provider_device_add (FU_PROVIDER (provider_dell), item->device);
+
+	/* FIXME: g_autoptr on the smi object */
+	dell_smi_obj_free(smi);
+
+}
+
+/**
+ * fu_provider_dell_device_removed_cb:
+ **/
+static void
+fu_provider_dell_device_removed_cb (GUsbContext *ctx,
+				    GUsbDevice *device,
+				    FuProviderDell *provider_dell)
+{
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
+	FuProviderDellDockItem *item;
+	g_autofree gchar *dock_key = NULL;
+	const gchar *supported_docks[] = {"TB15", "WD15"};
+	const gchar *dock_guid;
+	guint16 pid;
+	guint16 vid;
+	guint i;
+
+	vid = g_usb_device_get_vid(device);
+	pid = g_usb_device_get_pid(device);
+
+	/* we're going to match on the Realtek NIC in the dock */
+	if (!(vid == 0x0bda && pid == 0x8153))
+		return;
+
+	/* already in database? */
+	for (i=0; i < G_N_ELEMENTS(supported_docks); i++) {
+		dock_guid = as_utils_guid_from_string(supported_docks[i]);
+		dock_key = fu_provider_dell_get_dock_key(device, dock_guid);
+		item = g_hash_table_lookup (priv->devices, dock_key);
+		if (item)
+			break;
+	}
+	if (item == NULL)
+		return;
+
+	fu_provider_device_remove (FU_PROVIDER (provider_dell), item->device);
+	g_hash_table_remove(priv->devices, dock_key);
 }
 
 /**
@@ -192,7 +480,7 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 	out = g_malloc0(sizeof(struct tpm_status));
 
 	/* Execute TPM Status Query */
-	args[0] = DACI_ARG_TPM;
+	args[0] = DACI_FLASH_ARG_TPM;
 	ret = dell_simple_ci_smi(DACI_FLASH_INTERFACE_CLASS,
 				 DACI_FLASH_INTERFACE_SELECT,
 				 args,
@@ -301,6 +589,8 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 static gboolean
 fu_provider_dell_coldplug (FuProvider *provider, GError **error)
 {
+	FuProviderDell *provider_dell = FU_PROVIDER_DELL (provider);
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
 	guint8 dell_supported = 0;
 	gint uefi_supported = 0;
 	struct smbios_struct *de_table;
@@ -335,16 +625,17 @@ fu_provider_dell_coldplug (FuProvider *provider, GError **error)
 			     FWUPD_ERROR,
 			     FWUPD_ERROR_NOT_SUPPORTED,
 			     "DELL: UEFI capsule firmware updating not supported (%x)",
-			     dell_supported);
+			     uefi_supported);
 		return FALSE;
 	}
 
-	/* FIXME detect dock & hotplug */
+	/* Enumerate looking for a connected dock */
+	g_usb_context_enumerate (priv->usb_ctx);
 
-	if (!fu_provider_dell_detect_tpm (provider, error)) {
+	/* Look for switchable TPM */
+	if (!fu_provider_dell_detect_tpm (provider, error))
 		g_debug("DELL: No switchable TPM detected");
-		return FALSE;
-	}
+
 	return TRUE;
 }
 
@@ -521,6 +812,16 @@ fu_provider_dell_class_init (FuProviderDellClass *klass)
 static void
 fu_provider_dell_init (FuProviderDell *provider_dell)
 {
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
+	priv->devices = g_hash_table_new_full (g_str_hash, g_str_equal,
+					       g_free, (GDestroyNotify) fu_provider_dell_device_free);
+	priv->usb_ctx = g_usb_context_new (NULL);
+	g_signal_connect (priv->usb_ctx, "device-added",
+			  G_CALLBACK (fu_provider_dell_device_added_cb),
+			  provider_dell);
+	g_signal_connect (priv->usb_ctx, "device-removed",
+			  G_CALLBACK (fu_provider_dell_device_removed_cb),
+			  provider_dell);
 }
 
 /**
@@ -529,6 +830,12 @@ fu_provider_dell_init (FuProviderDell *provider_dell)
 static void
 fu_provider_dell_finalize (GObject *object)
 {
+	FuProviderDell *provider_dell = FU_PROVIDER_DELL (object);
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
+
+	g_hash_table_unref (priv->devices);
+	g_object_unref (priv->usb_ctx);
+
 	G_OBJECT_CLASS (fu_provider_dell_parent_class)->finalize (object);
 }
 
