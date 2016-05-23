@@ -101,16 +101,16 @@ fu_provider_dell_detect_dock (guint32 *location)
 				 (guint32 *) count_args,
 				 (guint32 *) count_out);
 	if (ret || count_out->ret != 0) {
-		g_debug("DELL: Failed to query system for dock count: "
+		g_debug("Dell: Failed to query system for dock count: "
 			"(%d) (%d)", ret, count_out->ret);
 		return FALSE;
 	}
 	if (count_out->count < 1) {
-		g_debug("DELL: no dock plugged in");
+		g_debug("Dell: no dock plugged in");
 		return FALSE;
 	}
 	*location = count_out->location;
-	g_debug("DELL: Dock count %u, location %u.",
+	g_debug("Dell: Dock count %u, location %u.",
 		count_out->count, *location);
 	return TRUE;
 
@@ -206,7 +206,7 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 	/* Look up more information on dock */
 	smi = dell_smi_factory(DELL_SMI_DEFAULTS);
 	if (!smi) {
-		g_debug("DELL: failure initializing SMI");
+		g_debug("Dell: failure initializing SMI");
 		return;
 	}
 	dell_smi_obj_set_class(smi, DACI_DOCK_CLASS);
@@ -216,24 +216,24 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 	buf_size = sizeof(DOCK_INFO_RECORD);
 	buf.buf = dell_smi_obj_make_buffer_frombios_auto(smi, cbARG3, buf_size);
 	if (!buf.buf) {
-		g_debug("DELL: failed to initialize buffer");
+		g_debug("Dell: failed to initialize buffer");
 		dell_smi_obj_free(smi);
 		return;
 	}
 	ret = dell_smi_obj_execute(smi);
 	if (ret != 0) {
-		g_debug("DELL: SMI execution failed");
+		g_debug("Dell: SMI execution failed");
 		dell_smi_obj_free(smi);
 		return;
 	}
 	result = dell_smi_obj_get_res(smi, cbARG1);
 	if (result != 0) {
 		if (result == -6)
-			g_debug("DELL: Invalid buffer size, sent %d, needed %d",
+			g_debug("Dell: Invalid buffer size, sent %d, needed %d",
 				buf_size,
 				dell_smi_obj_get_res(smi, cbARG2));
 		else
-			g_debug("DELL: SMI execution returned error: %d",
+			g_debug("Dell: SMI execution returned error: %d",
 				result);
 		dell_smi_obj_free(smi);
 		return;
@@ -241,7 +241,7 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 
 	if (buf.record->dock_info_header.dir_version != 1) {
 		dell_smi_obj_free(smi);
-		g_debug("DELL: Dock info header version unknown: %d",
+		g_debug("Dell: Dock info header version unknown: %d",
 			buf.record->dock_info_header.dir_version);
 		return;
 	}
@@ -253,24 +253,24 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 			dock_type = "WD15";
 			break;
 		default:
-			g_debug("DELL: Dock type %d unknown",
+			g_debug("Dell: Dock type %d unknown",
 				buf.record->dock_info_header.dock_type);
 	}
 
 	dock_info = &buf.record->dock_info;
-	g_debug("DELL: dock description: %s", dock_info->dock_description);
+	g_debug("Dell: dock description: %s", dock_info->dock_description);
 	/* Note: fw package version is deprecated, look at components instead */
-	g_debug("DELL: dock flash pkg ver: 0x%x", dock_info->flash_pkg_version);
-	g_debug("DELL: dock cable type: %d", dock_info->cable_type);
-	g_debug("DELL: dock location: %d", dock_info->location);
-	g_debug("DELL: dock component count: %d", dock_info->component_count);
+	g_debug("Dell: dock flash pkg ver: 0x%x", dock_info->flash_pkg_version);
+	g_debug("Dell: dock cable type: %d", dock_info->cable_type);
+	g_debug("Dell: dock location: %d", dock_info->location);
+	g_debug("Dell: dock component count: %d", dock_info->component_count);
 
 	for (i = 0; i < dock_info->component_count; i++) {
 		if (i > MAX_COMPONENTS) {
-			g_debug("DELL: Too many components.  Invalid: #%d", i);
+			g_debug("Dell: Too many components.  Invalid: #%d", i);
 			break;
 		}
-		g_debug("DELL: dock component %d: %s (version 0x%x)", i,
+		g_debug("Dell: dock component %d: %s (version 0x%x)", i,
 			dock_info->components[i].description,
 			dock_info->components[i].fw_version);
 	}
@@ -288,7 +288,7 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 	dock_key = fu_provider_dell_get_dock_key(device, dock_guid);
 	item = g_hash_table_lookup(priv->devices, dock_key);
 	if (item != NULL) {
-		g_debug("DELL: Item %s is already registered.", dock_key);
+		g_debug("Dell: Item %s is already registered.", dock_key);
 		return;
 	}
 
@@ -487,19 +487,19 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 				 (guint32 *) out);
 
 	if (ret || out->ret != 0) {
-		g_debug("DELL: Failed to query system for TPM information: "
+		g_debug("Dell: Failed to query system for TPM information: "
 			"(%d) (%d)", ret, out->ret);
 		return FALSE;
 	}
 	/* HW version is output in second /input/ arg
 	 * it may be relevant as next gen TPM is enabled
 	 */
-	g_debug("DELL: TPM HW version: 0x%x", args[1]);
-	g_debug("DELL: TPM Status: 0x%x", out->status);
+	g_debug("Dell: TPM HW version: 0x%x", args[1]);
+	g_debug("Dell: TPM Status: 0x%x", out->status);
 
 	/* Test TPM enabled (Bit 0) */
 	if (!(out->status & TPM_EN_MASK)) {
-		g_debug("DELL: TPM not enabled (%x)", out->status);
+		g_debug("Dell: TPM not enabled (%x)", out->status);
 		return FALSE;
 	}
 
@@ -517,7 +517,7 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 		guid_raw_alt = 	TPM_GUID_1_2;
 	}
 	else {
-		g_debug("DELL: Unable to determine TPM mode");
+		g_debug("Dell: Unable to determine TPM mode");
 		return FALSE;
 	}
 	efi_guid_to_str(&guid_raw, &tpm_guid);
@@ -575,7 +575,7 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 		fu_device_set_flashes_left (dev_alt, out->flashes_left);
 	}
 	else
-		g_debug("DELL: %s mode switch disabled due to TPM ownership",
+		g_debug("Dell: %s mode switch disabled due to TPM ownership",
 			pretty_tpm_name);
 
 	fu_provider_device_add (provider, dev);
@@ -603,7 +603,7 @@ fu_provider_dell_coldplug (FuProvider *provider, GError **error)
 		g_set_error (error,
 			     FWUPD_ERROR,
 			     FWUPD_ERROR_NOT_SUPPORTED,
-			     "DELL: firmware updating not supported (%x)",
+			     "Dell: firmware updating not supported (%x)",
 			     dell_supported);
 		return FALSE;
 	}
@@ -624,7 +624,7 @@ fu_provider_dell_coldplug (FuProvider *provider, GError **error)
 		g_set_error (error,
 			     FWUPD_ERROR,
 			     FWUPD_ERROR_NOT_SUPPORTED,
-			     "DELL: UEFI capsule firmware updating not supported (%x)",
+			     "Dell: UEFI capsule firmware updating not supported (%x)",
 			     uefi_supported);
 		return FALSE;
 	}
@@ -634,7 +634,7 @@ fu_provider_dell_coldplug (FuProvider *provider, GError **error)
 
 	/* Look for switchable TPM */
 	if (!fu_provider_dell_detect_tpm (provider, error))
-		g_debug("DELL: No switchable TPM detected");
+		g_debug("Dell: No switchable TPM detected");
 
 	return TRUE;
 }
@@ -665,13 +665,13 @@ fu_provider_dell_unlock(FuProvider *provider,
 	guint flashes_left_alt = 0;
 
 	/* For unlocking TPM1.2 <-> TPM2.0 switching */
-	g_debug ("DELL: Unlocking upgrades for: %s (%s)", fu_device_get_name(device),
+	g_debug ("Dell: Unlocking upgrades for: %s (%s)", fu_device_get_name(device),
 		 fu_device_get_id (device));
 	device_alt = fu_device_get_alternate(device);
 
 	if (!device_alt)
 		return FALSE;
-	g_debug ("DELL: Preventing upgrades for: %s (%s)", fu_device_get_name(device_alt),
+	g_debug ("Dell: Preventing upgrades for: %s (%s)", fu_device_get_name(device_alt),
 		 fu_device_get_id (device_alt));
 
 	flashes_left = fu_device_get_flashes_left(device);
@@ -729,7 +729,7 @@ fu_provider_dell_update (FuProvider *provider,
 	if (fu_provider_dell_get_limited_flashes(device)) {
 		flashes_left = fu_device_get_flashes_left(device);
 		name = fu_device_get_name(device);
-		g_debug("DELL: %s has %d flashes left", name, flashes_left);
+		g_debug("Dell: %s has %d flashes left", name, flashes_left);
 		if (flashes_left == 0) {
 			g_set_error (error,
 				     FWUPD_ERROR,
@@ -751,7 +751,7 @@ fu_provider_dell_update (FuProvider *provider,
 	}
 
 	/* perform the update */
-	g_debug ("DELL: Performing capsule update");
+	g_debug ("Dell: Performing capsule update");
 
 	fwup_resource_iter_create (&iter);
 	fwup_resource_iter_next (iter, &re);
