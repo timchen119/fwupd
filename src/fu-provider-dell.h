@@ -42,20 +42,20 @@ FuProvider	*fu_provider_dell_new		(void);
 G_END_DECLS
 
 /* These are used to indicate the status of a previous DELL flash */
-#define DELL_SUCCESS		0x0000
-#define DELL_CONSISTENCY_FAIL	0x0001
-#define DELL_FLASH_MEMORY_FAIL	0x0002
-#define DELL_FLASH_NOT_READY	0x0003
-#define DELL_FLASH_DISABLED	0x0004
-#define DELL_BATTERY_MISSING	0x0005
-#define DELL_BATTERY_DEAD	0x0006
-#define DELL_AC_MISSING		0x0007
-#define DELL_CANT_SET_12V	0x0008
-#define DELL_CANT_UNSET_12V	0x0009
+#define DELL_SUCCESS			0x0000
+#define DELL_CONSISTENCY_FAIL		0x0001
+#define DELL_FLASH_MEMORY_FAIL		0x0002
+#define DELL_FLASH_NOT_READY		0x0003
+#define DELL_FLASH_DISABLED		0x0004
+#define DELL_BATTERY_MISSING		0x0005
+#define DELL_BATTERY_DEAD		0x0006
+#define DELL_AC_MISSING			0x0007
+#define DELL_CANT_SET_12V		0x0008
+#define DELL_CANT_UNSET_12V		0x0009
 #define DELL_FAILURE_BLOCK_ERASE	0x000A
-#define DELL_GENERAL_FAILURE	0x000B
-#define DELL_DATA_MISCOMPARE	0x000C
-#define DELL_IMAGE_MISSING	0x000D
+#define DELL_GENERAL_FAILURE		0x000B
+#define DELL_DATA_MISCOMPARE		0x000C
+#define DELL_IMAGE_MISSING		0x000D
 #define DELL_DID_NOTHING		0xFFFF
 
 /* These are nodes that will indicate information about
@@ -113,7 +113,7 @@ typedef struct _DOCK_INFO {
 	guint8		location;		/* Location of the dock */
 	guint8		reserved;
 	guint8		component_count;
-	COMPONENTS	components[MAX_COMPONENTS];		/* number of component_count */
+	COMPONENTS	components[MAX_COMPONENTS];	/* number of component_count */
 } DOCK_INFO;
 
 typedef struct _DOCK_INFO_HEADER {
