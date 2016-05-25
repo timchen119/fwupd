@@ -1824,48 +1824,46 @@ fu_main_daemon_method_call (GDBusConnection *connection, const gchar *sender,
 		if (app == NULL)
 			app = AS_APP (g_ptr_array_index (apps, 0));
 
-		g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
-
-		/* get guids */
+		/* get guid */
 		provides = as_app_get_provides (app);
 		for (i = 0; i < provides->len; i++) {
 			AsProvide *prov = AS_PROVIDE (g_ptr_array_index (provides, i));
 			if (as_provide_get_kind (prov) == AS_PROVIDE_KIND_FIRMWARE_FLASHED) {
 				guid = as_provide_get_value (prov);
-				if (guid == NULL) {
-					g_dbus_method_invocation_return_error (invocation,
-									       FWUPD_ERROR,
-									       FWUPD_ERROR_INTERNAL,
-									       "component has no GUID");
-				return;
-				}
-
-				/* verify trust */
-				rel = as_app_get_release_default (app);
-				if (!fu_main_get_release_trust_flags (rel, &trust_flags, &error)) {
-					g_dbus_method_invocation_return_gerror (invocation, error);
-				return;
-				}
-
-
-				/* is a online or offline update appropriate */
-				item = fu_main_get_item_by_guid (priv, guid);
-				if (item != NULL)
-					device_flags = fu_device_get_flags (item->device);
-
-				g_variant_builder_add (&builder, "{sv}",
-						       FWUPD_RESULT_KEY_GUID,
-						       g_variant_new_string (guid));
+				break;
 			}
+		}
+		if (guid == NULL) {
+			g_dbus_method_invocation_return_error (invocation,
+							       FWUPD_ERROR,
+							       FWUPD_ERROR_INTERNAL,
+							       "component has no GUID");
+			return;
+		}
+
+		/* verify trust */
+		rel = as_app_get_release_default (app);
+		if (!fu_main_get_release_trust_flags (rel, &trust_flags, &error)) {
+			g_dbus_method_invocation_return_gerror (invocation, error);
+			return;
 		}
 
 		/* possibly convert the version from 0x to dotted */
 		fu_main_vendor_quirk_release_version (app);
 
+		/* is a online or offline update appropriate */
+		item = fu_main_get_item_by_guid (priv, guid);
+		if (item != NULL)
+			device_flags = fu_device_get_flags (item->device);
+
 		/* create an array with all the metadata in */
+		g_variant_builder_init (&builder, G_VARIANT_TYPE_ARRAY);
 		g_variant_builder_add (&builder, "{sv}",
 				       FWUPD_RESULT_KEY_UPDATE_VERSION,
 				       g_variant_new_string (as_release_get_version (rel)));
+		g_variant_builder_add (&builder, "{sv}",
+				       FWUPD_RESULT_KEY_GUID,
+				       g_variant_new_string (guid));
 		g_variant_builder_add (&builder, "{sv}",
 				       FWUPD_RESULT_KEY_UPDATE_SIZE,
 				       g_variant_new_uint64 (as_release_get_size (rel, AS_SIZE_KIND_INSTALLED)));
