@@ -77,7 +77,7 @@ fu_provider_dell_detect_dock (guint32 *location)
 	g_autofree struct dock_count_out *count_out;
 	guint ret;
 
-	/* Look up dock count */
+	/* look up dock count */
 	count_args = g_malloc0 (sizeof(struct dock_count_in));
 	count_out  = g_malloc0 (sizeof(struct dock_count_out));
 	count_args->argument = DACI_DOCK_ARG_COUNT;
@@ -121,6 +121,7 @@ fu_provider_dell_get_version_format (void)
 {
 	guint i;
 	g_autofree gchar *content = NULL;
+
 	/* any vendors match */
 	if (!g_file_get_contents ("/sys/class/dmi/id/sys_vendor",
 				  &content, NULL, NULL))
@@ -174,7 +175,7 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 	g_autofree gchar *dock_id = NULL;
 	g_autofree gchar *dock_name = NULL;
 
-	/* Don't look up immediately if a dock is connected as that would
+	/* don't look up immediately if a dock is connected as that would
 	   mean a SMI on every USB device that showed up on the system */
 	vid = g_usb_device_get_vid (device);
 	pid = g_usb_device_get_pid (device);
@@ -185,7 +186,7 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 	if (!fu_provider_dell_detect_dock (&location))
 		return;
 
-	/* Look up more information on dock */
+	/* look up more information on dock */
 	smi = dell_smi_factory (DELL_SMI_DEFAULTS);
 	if (!smi) {
 		g_debug ("Dell: failure initializing SMI");
@@ -437,7 +438,7 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 	args = g_malloc0 (sizeof(guint32) *4);
 	out = g_malloc0 (sizeof(struct tpm_status));
 
-	/* Execute TPM Status Query */
+	/* execute TPM Status Query */
 	args[0] = DACI_FLASH_ARG_TPM;
 	ret = dell_simple_ci_smi (DACI_FLASH_INTERFACE_CLASS,
 				  DACI_FLASH_INTERFACE_SELECT,
@@ -455,13 +456,13 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 	g_debug ("Dell: TPM HW version: 0x%x", args[1]);
 	g_debug ("Dell: TPM Status: 0x%x", out->status);
 
-	/* Test TPM enabled (Bit 0) */
+	/* test TPM enabled (Bit 0) */
 	if (!(out->status & TPM_EN_MASK)) {
 		g_debug ("Dell: TPM not enabled (%x)", out->status);
 		return FALSE;
 	}
 
-	/* Test TPM mode to determine current mode */
+	/* test TPM mode to determine current mode */
 	if (((out->status & TPM_TYPE_MASK) >> 8) == TPM_1_2_MODE) {
 		tpm_mode = "1.2";
 		tpm_mode_alt = "2.0";
@@ -483,25 +484,25 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 	tpm_guid_alt = as_utils_guid_from_string (tpm_guid_raw_alt);
 	tpm_id_alt = g_strdup_printf ("DELL-%s" G_GUINT64_FORMAT, tpm_guid_alt);
 
-	g_debug("Dell: Creating primary TPM GUID %s and secondary TPM GUID %s",
-		tpm_guid_raw, tpm_guid_raw_alt);
+	g_debug ("Dell: Creating primary TPM GUID %s and secondary TPM GUID %s",
+		 tpm_guid_raw, tpm_guid_raw_alt);
 	version_str = as_utils_version_from_uint32 (out->fw_version,
 						    AS_VERSION_PARSE_FLAG_NONE);
 
-	/* Make it clear that the TPM is a discrete device of the product */
-	if (!g_file_get_contents("/sys/class/dmi/id/product_name",
-				 &product_name,NULL, NULL)) {
+	/* make it clear that the TPM is a discrete device of the product */
+	if (!g_file_get_contents ("/sys/class/dmi/id/product_name",
+				  &product_name,NULL, NULL)) {
 		g_set_error_literal (error,
 				     FWUPD_ERROR,
 				     FWUPD_ERROR_NOT_SUPPORTED,
 				     "Unable to read product information");
 		return FALSE;
 	}
-	g_strchomp(product_name);
+	g_strchomp (product_name);
 	pretty_tpm_name = g_strdup_printf ("%s TPM %s", product_name, tpm_mode);
 	pretty_tpm_name_alt = g_strdup_printf ("%s TPM %s", product_name, tpm_mode_alt);
 
-	/* Build Standard device nodes */
+	/* build Standard device nodes */
 	dev = fu_device_new ();
 	fu_device_set_id (dev, tpm_id);
 	fu_device_add_guid (dev, tpm_guid);
@@ -514,7 +515,7 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 		fu_device_set_flashes_left (dev, out->flashes_left);
 	}
 
-	/* Build alternate device node */
+	/* build alternate device node */
 	dev_alt = fu_device_new();
 	fu_device_set_id (dev_alt, tpm_id_alt);
 	fu_device_add_guid (dev_alt, tpm_guid_alt);
@@ -588,10 +589,10 @@ fu_provider_dell_coldplug (FuProvider *provider, GError **error)
 		return FALSE;
 	}
 
-	/* Enumerate looking for a connected dock */
+	/* enumerate looking for a connected dock */
 	g_usb_context_enumerate (priv->usb_ctx);
 
-	/* Look for switchable TPM */
+	/* look for switchable TPM */
 	if (!fu_provider_dell_detect_tpm (provider, error))
 		g_debug ("Dell: No switchable TPM detected");
 
@@ -623,7 +624,7 @@ fu_provider_dell_unlock(FuProvider *provider,
 	guint flashes_left = 0;
 	guint flashes_left_alt = 0;
 
-	/* For unlocking TPM1.2 <-> TPM2.0 switching */
+	/* for unlocking TPM1.2 <-> TPM2.0 switching */
 	g_debug ("Dell: Unlocking upgrades for: %s (%s)", fu_device_get_name (device),
 		 fu_device_get_id (device));
 	device_alt = fu_device_get_alternate (device);
@@ -661,7 +662,7 @@ fu_provider_dell_unlock(FuProvider *provider,
 	fu_device_set_flags (device, device_flags_alt);
 	fu_device_set_flags (device_alt, device_flags_alt & ~FU_DEVICE_FLAG_ALLOW_OFFLINE);
 
-	/* Make sure that this unlocked device can be updated */
+	/* make sure that this unlocked device can be updated */
 	fu_device_set_version (device, "0.0.0.0");
 
 	return TRUE;
