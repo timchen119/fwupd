@@ -680,10 +680,12 @@ fu_provider_dell_update (FuProvider *provider,
 	g_autoptr(fwup_resource_iter) iter = NULL;
 	fwup_resource *re = NULL;
 	const gchar *name = NULL;
-	const gchar *guidstr = NULL;
 	gint rc;
 	guint flashes_left;
+#ifdef HAVE_UEFI_GUID
+	const gchar *guidstr = NULL;
 	efi_guid_t guid;
+#endif
 
 	/* test the flash counter
 	 * - devices with 0 left at coldplug aren't allowed offline updates
@@ -708,8 +710,16 @@ fu_provider_dell_update (FuProvider *provider,
 	/* perform the update */
 	g_debug ("Dell: Performing capsule update");
 
+	/* Stuff the payload into a different GUID
+	 * - with fwup 0.5 this uses the ESRT GUID
+	 * - with fwup 0.6 this uses the payload's GUID
+	 * it's preferable to use payload GUID to avoid
+	 * a corner case scenario of UEFI BIOS and non-ESRT
+	 * update happening at same time
+	 */
 	fwup_resource_iter_create (&iter);
 	fwup_resource_iter_next (iter, &re);
+#ifdef HAVE_UEFI_GUID
 	guidstr = fu_device_get_guid_default (device);
 	rc = efi_str_to_guid (guidstr, &guid);
 	if (rc < 0) {
@@ -728,7 +738,12 @@ fu_provider_dell_update (FuProvider *provider,
 			     strerror (rc));
 		return FALSE;
 	}
-
+#endif
+	/* NOTE: if there are problems with this working, adjust the
+	 * GUID in the capsule header to match something in ESRT.
+	 * This won't actually cause any bad behavior because the real
+	 * payload GUID is extracted later on.
+	 */
 	fu_provider_set_status (provider, FWUPD_STATUS_SCHEDULING);
 	rc = fwup_set_up_update_with_buf (re, 0,
 					  g_bytes_get_data (blob_fw, NULL),
