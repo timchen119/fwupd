@@ -27,6 +27,7 @@
 #include <gusb.h>
 #include <appstream-glib.h>
 #include <glib/gstdio.h>
+#include <smbios_c/system_info.h>
 #include <smbios_c/smbios.h>
 #include <smbios_c/smi.h>
 #include <smbios_c/obj/smi.h>
@@ -39,23 +40,6 @@
 
 static void	fu_provider_dell_finalize	(GObject	*object);
 
-
-/* system ID's that can switch TPM 1.2 -> TPM 2.0 from 2015
- * This is currently documented here:
- * http://en.community.dell.com/techcenter/enterprise-client/w/wiki/11850.how-to-change-tpm-modes-1-2-2-0
- * Latitude 3470, 3570, E5270, E5470, E5570, E7270, E7470
- * Optiplex 3040, 3240, 5040, 7040, 7240
- * Precision 3420, 3620, 3510, 5510, 7710
- * XPS 9550, 9350
- *
- * This is not strictly necessary to look up thanks to DACI calls, but in case it's needed for debugging
- * the information is here.
- *
- * static guint16 gen7_tpm_switch[] = {0x06F2, 0x06F3, 0x06DD, 0x06DE, 0x06DF,
- *				    0x06DB, 0x06DC, 0x06BB, 0x06C6, 0x06BA,
- *				    0x06B9, 0x05CA, 0x06C7, 0x06B7, 0x06E0,
- *				    0x06E5, 0x06D9, 0x06DA, 0x06E4, 0x0704};
- */
 
  /**
   * FuProviderDellPrivate:
@@ -355,32 +339,6 @@ fu_provider_dell_device_removed_cb (GUsbContext *ctx,
 }
 
 /**
- * fu_provider_dell_get_limited_flashes:
- *
- * checks if the device is limited in flashes
- **/
-static gboolean
-fu_provider_dell_get_limited_flashes (FuDevice *device)
-{
-	const efi_guid_t limited_guid[] = { TPM_GUID_1_2, TPM_GUID_2_0 };
-	const gchar *device_guid;
-	gboolean limited = FALSE;
-	guint i;
-
-	device_guid = fu_device_get_guid_default (device);
-	for (i = 0; i < G_N_ELEMENTS (limited_guid); i++) {
-		g_autofree gchar *compare_guid = NULL;
-		compare_guid = g_strdup ("00000000-0000-0000-0000-000000000000");
-		efi_guid_to_str (&limited_guid[i], &compare_guid);
-		if (g_strcmp0 (device_guid, compare_guid) == 0) {
-			limited = TRUE;
-			break;
-		}
-	}
-	return limited;
-}
-
-/**
  * fu_provider_dell_get_results:
  **/
 static gboolean
@@ -457,16 +415,17 @@ fu_provider_dell_get_results (FuProvider *provider, FuDevice *device, GError **e
 static gboolean
 fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 {
-	efi_guid_t guid_raw;
-	efi_guid_t guid_raw_alt;
 	const gchar *tpm_mode;
 	const gchar *tpm_mode_alt;
 	guint ret;
+	guint16 system_id;
 	g_autofree gchar *pretty_tpm_name_alt = NULL;
 	g_autofree gchar *pretty_tpm_name = NULL;
 	g_autofree gchar *product_name = NULL;
+	g_autofree gchar *tpm_guid_raw_alt = NULL;
 	g_autofree gchar *tpm_guid_alt = NULL;
 	g_autofree gchar *tpm_guid = NULL;
+	g_autofree gchar *tpm_guid_raw = NULL;
 	g_autofree gchar *tpm_id_alt = NULL;
 	g_autofree gchar *tpm_id = NULL;
 	g_autofree gchar *version_str = NULL;
@@ -506,22 +465,26 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 	if (((out->status & TPM_TYPE_MASK) >> 8) == TPM_1_2_MODE) {
 		tpm_mode = "1.2";
 		tpm_mode_alt = "2.0";
-		guid_raw = 	TPM_GUID_1_2;
-		guid_raw_alt = 	TPM_GUID_2_0;
 	} else if (((out->status & TPM_TYPE_MASK) >> 8) == TPM_2_0_MODE) {
 		tpm_mode = "2.0";
 		tpm_mode_alt = "1.2";
-		guid_raw = 	TPM_GUID_2_0;
-		guid_raw_alt = 	TPM_GUID_1_2;
 	} else {
 		g_debug ("Dell: Unable to determine TPM mode");
 		return FALSE;
 	}
-	efi_guid_to_str (&guid_raw, &tpm_guid);
-	efi_guid_to_str (&guid_raw_alt, &tpm_guid_alt);
 
+	system_id = sysinfo_get_dell_system_id();
+
+	tpm_guid_raw = g_strdup_printf("%04x-%s", system_id, tpm_mode);
+	tpm_guid = as_utils_guid_from_string (tpm_guid_raw);
 	tpm_id = g_strdup_printf ("DELL-%s" G_GUINT64_FORMAT, tpm_guid);
+
+	tpm_guid_raw_alt = g_strdup_printf("%04x-%s", system_id, tpm_mode_alt);
+	tpm_guid_alt = as_utils_guid_from_string (tpm_guid_raw_alt);
 	tpm_id_alt = g_strdup_printf ("DELL-%s" G_GUINT64_FORMAT, tpm_guid_alt);
+
+	g_debug("Dell: Creating primary TPM GUID %s and secondary TPM GUID %s",
+		tpm_guid_raw, tpm_guid_raw_alt);
 	version_str = as_utils_version_from_uint32 (out->fw_version,
 						    AS_VERSION_PARSE_FLAG_NONE);
 
@@ -722,19 +685,15 @@ fu_provider_dell_update (FuProvider *provider,
 	guint flashes_left;
 	efi_guid_t guid;
 
-	/* test the flash counter */
-	if (fu_provider_dell_get_limited_flashes (device)) {
-		flashes_left = fu_device_get_flashes_left (device);
+	/* test the flash counter
+	 * - devices with 0 left at coldplug aren't allowed offline updates
+	 * - devices greater than 0 should show a warning when near 0
+	 */
+	flashes_left = fu_device_get_flashes_left (device);
+	if (flashes_left > 0) {
 		name = fu_device_get_name (device);
 		g_debug ("Dell: %s has %d flashes left", name, flashes_left);
-		if (flashes_left == 0) {
-			g_set_error (error,
-				     FWUPD_ERROR,
-				     FWUPD_ERROR_NOT_SUPPORTED,
-				     "ERROR: %s no flashes left.",
-				     name);
-			return FALSE;
-		} else if ((flags & FWUPD_INSTALL_FLAG_FORCE) == 0 &&
+		if ((flags & FWUPD_INSTALL_FLAG_FORCE) == 0 &&
 			   flashes_left <= 2) {
 			g_set_error (error,
 				     FWUPD_ERROR,
