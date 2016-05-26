@@ -337,11 +337,11 @@ fu_provider_dell_func (void)
 	g_assert (device != NULL);
 	g_assert (device_alt != NULL);
 
-	/* Make sure 2.0 is locked */
+	/* make sure 2.0 is locked */
 	flags = fu_device_get_flags (device);
 	g_assert_cmpint (flags & FU_DEVICE_FLAG_LOCKED, >, 0);
 
-	/* Make sure not allowed to flash 1.2 */
+	/* make sure not allowed to flash 1.2 */
 	flags = fu_device_get_flags (device_alt);
 	g_assert_cmpint (flags & FU_DEVICE_FLAG_ALLOW_OFFLINE, !=, 1);
 
@@ -372,7 +372,7 @@ fu_provider_dell_func (void)
 	g_assert (device != NULL);
 	g_assert (device_alt != NULL);
 
-	/* Make sure allowed to flash 1.2 */
+	/* make sure allowed to flash 1.2 */
 	flags = fu_device_get_flags (device_alt);
 	g_assert_cmpint(flags & FU_DEVICE_FLAG_ALLOW_OFFLINE, >, 0);
 
@@ -403,7 +403,7 @@ fu_provider_dell_func (void)
 	g_assert (device != NULL);
 	g_assert (device_alt != NULL);
 
-	/* Make sure allowed to flash 1.2 but not 2.0 */
+	/* make sure allowed to flash 1.2 but not 2.0 */
 	flags = fu_device_get_flags (device_alt);
 	g_assert_cmpint (flags & FU_DEVICE_FLAG_ALLOW_OFFLINE, >, 0);
 	flags = fu_device_get_flags (device);
@@ -414,7 +414,7 @@ fu_provider_dell_func (void)
 	g_assert_no_error (error);
 	g_assert (ret);
 
-	/* Make sure no longer allowed to flash 1.2 but can flash 2.0 */
+	/* make sure no longer allowed to flash 1.2 but can flash 2.0 */
 	flags = fu_device_get_flags (device_alt);
 	g_assert_cmpint (flags & FU_DEVICE_FLAG_ALLOW_OFFLINE, ==, 0);
 	flags = fu_device_get_flags (device);
@@ -441,7 +441,7 @@ fu_provider_dell_func (void)
 	g_assert (device != NULL);
 	g_assert (device_alt != NULL);
 
-	/* Make sure allowed to flash 2.0 but not 1.2 */
+	/* make sure allowed to flash 2.0 but not 1.2 */
 	flags = fu_device_get_flags (device_alt);
 	g_assert_cmpint (flags & FU_DEVICE_FLAG_ALLOW_OFFLINE, >, 0);
 	flags = fu_device_get_flags (device);
