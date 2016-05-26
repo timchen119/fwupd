@@ -38,6 +38,10 @@ struct _FuProviderDellClass
 };
 
 FuProvider	*fu_provider_dell_new		(void);
+void		fu_provider_dell_inject_fake_data (FuProviderDell *provider_dell,
+						   guint32 *output);
+gboolean
+fu_provider_dell_detect_tpm (FuProvider *provider, GError **error);
 
 G_END_DECLS
 

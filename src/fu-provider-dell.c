@@ -47,6 +47,8 @@ static void	fu_provider_dell_finalize	(GObject	*object);
 typedef struct {
 	GHashTable		*devices;	/* DeviceKey:FuProviderDellDockItem */
 	GUsbContext		*usb_ctx;
+	gboolean		fake_smbios;
+	guint32			fake_output[4];
 } FuProviderDellPrivate;
 
 typedef struct {
@@ -68,26 +70,104 @@ fu_provider_dell_get_name (FuProvider *provider)
 }
 
 /**
+ * fu_provider_dell_inject_fake_data:
+ **/
+void
+fu_provider_dell_inject_fake_data (FuProviderDell *provider_dell,
+				   guint32 *output)
+{
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
+	guint i;
+
+	if (!priv->fake_smbios)
+		return;
+	for (i = 0; i < 4; i++)
+		priv->fake_output[i] = output[i];
+}
+
+/**
+ * fu_provider_dell_execute_smi:
+ **/
+static gboolean
+fu_provider_dell_execute_smi (FuProviderDell *provider_dell, struct dell_smi_obj *smi)
+{
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
+	guint ret;
+
+	if (priv->fake_smbios)
+		return TRUE;
+
+	ret = dell_smi_obj_execute (smi);
+	if (ret != 0) {
+		g_debug ("Dell: SMI execution failed: %d", ret);
+		dell_smi_obj_free (smi);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+/**
+ * fu_provider_dell_execute_simple_smi:
+ **/
+static gboolean
+fu_provider_dell_execute_simple_smi (FuProviderDell *provider_dell,
+				     guint32 class, guint32 select,
+				     guint32  *args, guint32 *out)
+{
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
+	guint ret;
+	guint i;
+
+	if (priv->fake_smbios) {
+		for (i = 0; i < 4; i++)
+			out[i] = priv->fake_output[i];
+		return TRUE;
+	}
+	ret = dell_simple_ci_smi (class, select, args, out);
+	if (ret) {
+		g_debug ("Dell: failed to run query %d/%d", class, select);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+/**
+ * fu_provider_dell_get_res:
+ **/
+static guint32
+fu_provider_dell_get_res (FuProviderDell *provider_dell,
+			  struct dell_smi_obj *smi, guint32 arg)
+{
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
+
+	if (priv->fake_smbios)
+		return priv->fake_output[arg];
+
+	return dell_smi_obj_get_res (smi, arg);
+}
+
+/**
  * fu_provider_dell_detect_dock:
  **/
 static gboolean
-fu_provider_dell_detect_dock (guint32 *location)
+fu_provider_dell_detect_dock (FuProviderDell *provider_dell, guint32 *location)
 {
 	g_autofree struct dock_count_in *count_args;
 	g_autofree struct dock_count_out *count_out;
-	guint ret;
 
 	/* look up dock count */
 	count_args = g_malloc0 (sizeof(struct dock_count_in));
 	count_out  = g_malloc0 (sizeof(struct dock_count_out));
 	count_args->argument = DACI_DOCK_ARG_COUNT;
-	ret = dell_simple_ci_smi (DACI_DOCK_CLASS,
-				  DACI_DOCK_SELECT,
-				  (guint32 *) count_args,
-				  (guint32 *) count_out);
-	if (ret || count_out->ret != 0) {
+	if (!fu_provider_dell_execute_simple_smi (provider_dell,
+						  DACI_DOCK_CLASS,
+						  DACI_DOCK_SELECT,
+						  (guint32 *) count_args,
+						  (guint32 *) count_out))
+		return FALSE;
+	if (count_out->ret != 0) {
 		g_debug ("Dell: Failed to query system for dock count: "
-			 "(%d) (%d)", ret, count_out->ret);
+			 "(%d)", count_out->ret);
 		return FALSE;
 	}
 	if (count_out->count < 1) {
@@ -168,7 +248,6 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 	struct dell_smi_obj *smi;
 	gint result;
 	gint i;
-	guint ret;
 	guint32 location;
 	g_autofree gchar *fw_version_str = NULL;
 	g_autofree gchar *dock_key = NULL;
@@ -183,7 +262,7 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 	/* we're going to match on the Realtek NIC in the dock */
 	if (!(vid == 0x0bda && pid == 0x8153))
 		return;
-	if (!fu_provider_dell_detect_dock (&location))
+	if (!fu_provider_dell_detect_dock (provider_dell, &location))
 		return;
 
 	/* look up more information on dock */
@@ -203,18 +282,14 @@ fu_provider_dell_device_added_cb (GUsbContext *ctx,
 		dell_smi_obj_free (smi);
 		return;
 	}
-	ret = dell_smi_obj_execute (smi);
-	if (ret != 0) {
-		g_debug ("Dell: SMI execution failed");
-		dell_smi_obj_free (smi);
+	if (!fu_provider_dell_execute_smi (provider_dell, smi))
 		return;
-	}
-	result = dell_smi_obj_get_res (smi, cbARG1);
+	result = fu_provider_dell_get_res (provider_dell, smi, cbARG1);
 	if (result != 0) {
 		if (result == -6) {
 			g_debug ("Dell: Invalid buffer size, sent %d, needed %d",
 				 buf_size,
-				 dell_smi_obj_get_res(smi, cbARG2));
+				 fu_provider_dell_get_res (provider_dell, smi, cbARG2));
 		} else {
 			g_debug ("Dell: SMI execution returned error: %d",
 				 result);
@@ -413,13 +488,14 @@ fu_provider_dell_get_results (FuProvider *provider, FuDevice *device, GError **e
 /**
  * fu_provider_dell_detect_tpm:
  **/
-static gboolean
+gboolean
 fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 {
+	FuProviderDell *provider_dell = FU_PROVIDER_DELL (provider);
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
 	const gchar *tpm_mode;
 	const gchar *tpm_mode_alt;
-	guint ret;
-	guint16 system_id;
+	guint16 system_id = 0;
 	g_autofree gchar *pretty_tpm_name_alt = NULL;
 	g_autofree gchar *pretty_tpm_name = NULL;
 	g_autofree gchar *product_name = NULL;
@@ -440,14 +516,16 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 
 	/* execute TPM Status Query */
 	args[0] = DACI_FLASH_ARG_TPM;
-	ret = dell_simple_ci_smi (DACI_FLASH_INTERFACE_CLASS,
-				  DACI_FLASH_INTERFACE_SELECT,
-				  args,
-				  (guint32 *) out);
+	if (!fu_provider_dell_execute_simple_smi(provider_dell,
+						 DACI_FLASH_INTERFACE_CLASS,
+						 DACI_FLASH_INTERFACE_SELECT,
+						 args,
+						 (guint32 *) out))
+		return FALSE;
 
-	if (ret || out->ret != 0) {
+	if (out->ret != 0) {
 		g_debug ("Dell: Failed to query system for TPM information: "
-			 "(%d) (%d)", ret, out->ret);
+			 "(%d)", out->ret);
 		return FALSE;
 	}
 	/* HW version is output in second /input/ arg
@@ -474,13 +552,14 @@ fu_provider_dell_detect_tpm (FuProvider *provider, GError **error)
 		return FALSE;
 	}
 
-	system_id = sysinfo_get_dell_system_id();
+	if (!priv->fake_smbios)
+		system_id = sysinfo_get_dell_system_id ();
 
-	tpm_guid_raw = g_strdup_printf("%04x-%s", system_id, tpm_mode);
+	tpm_guid_raw = g_strdup_printf ("%04x-%s", system_id, tpm_mode);
 	tpm_guid = as_utils_guid_from_string (tpm_guid_raw);
 	tpm_id = g_strdup_printf ("DELL-%s" G_GUINT64_FORMAT, tpm_guid);
 
-	tpm_guid_raw_alt = g_strdup_printf("%04x-%s", system_id, tpm_mode_alt);
+	tpm_guid_raw_alt = g_strdup_printf ("%04x-%s", system_id, tpm_mode_alt);
 	tpm_guid_alt = as_utils_guid_from_string (tpm_guid_raw_alt);
 	tpm_id_alt = g_strdup_printf ("DELL-%s" G_GUINT64_FORMAT, tpm_guid_alt);
 
@@ -555,10 +634,16 @@ fu_provider_dell_coldplug (FuProvider *provider, GError **error)
 	gint uefi_supported = 0;
 	struct smbios_struct *de_table;
 
+	if (priv->fake_smbios) {
+		g_debug("Dell: called with fake SMBIOS implementation. "
+			"We're ignoring test for SBMIOS table and ESRT. "
+			"Individual calls will need to be properly staged.");
+		return TRUE;
+	}
+
 	/* look at offset 0x00 for identifier meaning DELL is supported */
 	de_table = smbios_get_next_struct_by_type (0, 0xDE);
 	smbios_struct_get_data (de_table, &(dell_supported), 0x00, sizeof(guint8));
-
 	if (dell_supported != 0xDE) {
 		g_set_error (error,
 			     FWUPD_ERROR,
@@ -567,7 +652,6 @@ fu_provider_dell_coldplug (FuProvider *provider, GError **error)
 			     dell_supported);
 		return FALSE;
 	}
-
 	/* Check and make sure that ESRT is supported as well.
 	 *
 	 * This will indicate capsule support on the system.
@@ -588,6 +672,7 @@ fu_provider_dell_coldplug (FuProvider *provider, GError **error)
 			     uefi_supported);
 		return FALSE;
 	}
+
 
 	/* enumerate looking for a connected dock */
 	g_usb_context_enumerate (priv->usb_ctx);
@@ -678,6 +763,8 @@ fu_provider_dell_update (FuProvider *provider,
 			FwupdInstallFlags flags,
 			GError **error)
 {
+	FuProviderDell *provider_dell = FU_PROVIDER_DELL (provider);
+	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
 	g_autoptr(fwup_resource_iter) iter = NULL;
 	fwup_resource *re = NULL;
 	const gchar *name = NULL;
@@ -707,6 +794,9 @@ fu_provider_dell_update (FuProvider *provider,
 			return FALSE;
 		}
 	}
+
+	if (priv->fake_smbios)
+		return TRUE;
 
 	/* perform the update */
 	g_debug ("Dell: Performing capsule update");
@@ -784,6 +874,8 @@ static void
 fu_provider_dell_init (FuProviderDell *provider_dell)
 {
 	FuProviderDellPrivate *priv = GET_PRIVATE (provider_dell);
+	const gchar *tmp;
+
 	priv->devices = g_hash_table_new_full (g_str_hash, g_str_equal,
 					       g_free, (GDestroyNotify) fu_provider_dell_device_free);
 	priv->usb_ctx = g_usb_context_new (NULL);
@@ -793,6 +885,10 @@ fu_provider_dell_init (FuProviderDell *provider_dell)
 	g_signal_connect (priv->usb_ctx, "device-removed",
 			  G_CALLBACK (fu_provider_dell_device_removed_cb),
 			  provider_dell);
+	priv->fake_smbios = FALSE;
+	tmp = g_getenv ("FWUPD_DELL_FAKE_SMBIOS");
+	if (tmp != NULL)
+		priv->fake_smbios = TRUE;
 }
 
 /**

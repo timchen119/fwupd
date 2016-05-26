@@ -146,18 +146,6 @@ fwupd_LDADD +=						\
 	$(UEFI_LIBS)
 endif
 
-if HAVE_DELL
-fwupd_SOURCES +=					\
-	fu-provider-dell.c				\
-	fu-provider-dell.h
-AM_CPPFLAGS +=						\
-	$(LIBSMBIOS_CFLAGS)				\
-	$(EFIVAR_CFLAGS)
-fwupd_LDADD +=						\
-	$(LIBSMBIOS_LIBS)				\
-	$(EFIVAR_LIBS)
-endif
-
 fwupd_LDFLAGS =						\
 	$(PIE_LDFLAGS)					\
 	$(RELRO_LDFLAGS)
@@ -209,6 +197,26 @@ fu_self_test_CFLAGS =					\
 	-DFU_OFFLINE_DESTDIR=\"/tmp/fwupd-self-test\"	\
 	-DLOCALSTATEDIR=\"/tmp/fwupd-self-test/var\"	\
 	$(WARNINGFLAGS_C)
+
+if HAVE_DELL
+fwupd_SOURCES +=					\
+	fu-provider-dell.c				\
+	fu-provider-dell.h
+AM_CPPFLAGS +=						\
+	$(LIBSMBIOS_CFLAGS)				\
+	$(EFIVAR_CFLAGS)
+fwupd_LDADD +=						\
+	$(LIBSMBIOS_LIBS)				\
+	$(EFIVAR_LIBS)
+fu_self_test_LDADD +=					\
+	$(GUSB_LIBS)					\
+	$(UEFI_LIBS)					\
+	$(LIBSMBIOS_LIBS)				\
+	$(EFIVAR_LIBS)
+fu_self_test_SOURCES +=					\
+	fu-provider-dell.c				\
+	fu-provider-dell.h
+endif
 
 install-data-hook:
 	if test -w $(DESTDIR)$(prefix)/; then \
