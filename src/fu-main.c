@@ -48,6 +48,8 @@
 #include "fu-resources.h"
 #include "fu-quirks.h"
 
+#include "snappy.h"
+
 #ifdef HAVE_COLORHUG
   #include "fu-provider-chug.h"
 #endif
@@ -85,6 +87,9 @@ typedef struct {
 } FuDeviceItem;
 
 static gboolean fu_main_get_updates_item_update (FuMainPrivate *priv, FuDeviceItem *item);
+
+extern const char* get_snap_app_path();
+extern const char* get_snap_app_data_path();
 
 /**
  * fu_main_emit_changed:
@@ -259,7 +264,10 @@ fu_main_load_plugins (GHashTable *plugins, GError **error)
 	g_autoptr(GList) values = NULL;
 
 	/* search */
-	plugin_dir = g_build_filename (LIBDIR, "fwupd-plugins-1", NULL);
+	if (get_snap_app_data_path())
+		plugin_dir = g_build_filename (get_snap_app_data_path(), LIBDIR, "fwupd-plugins-1", NULL);
+	else
+		plugin_dir = g_build_filename (LIBDIR, "fwupd-plugins-1", NULL);
 	dir = g_dir_open (plugin_dir, 0, error);
 	if (dir == NULL)
 		return FALSE;
@@ -427,7 +435,10 @@ fu_main_get_release_trust_flags (AsRelease *release,
 	}
 
 	/* check we were installed correctly */
-	pki_dir = g_build_filename (SYSCONFDIR, "pki", "fwupd", NULL);
+	if (get_snap_app_data_path())
+		pki_dir = g_build_filename(get_snap_app_data_path(), SYSCONFDIR, "pki", "fwupd", NULL);
+	else
+		pki_dir = g_build_filename (SYSCONFDIR, "pki", "fwupd", NULL);
 	if (!g_file_test (pki_dir, G_FILE_TEST_EXISTS)) {
 		g_set_error (error,
 			     FWUPD_ERROR,
@@ -1055,6 +1066,8 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 	g_autoptr(GInputStream) stream_fd = NULL;
 	g_autoptr(GInputStream) stream = NULL;
 	g_autoptr(GInputStream) stream_sig = NULL;
+	g_autofree gchar *fw_path = NULL;
+	g_autofree gchar *xml_path = NULL;
 
 	/* read the entire file into memory */
 	stream_fd = g_unix_input_stream_new (fd, TRUE);
@@ -1100,7 +1113,11 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 
 	/* verify file */
 	kr = fu_keyring_new ();
-	if (!fu_keyring_add_public_keys (kr, "/etc/pki/fwupd-metadata", error))
+	if (get_snap_app_data_path())
+		fw_path = g_build_filename(get_snap_app_data_path(), "/etc/pki/fwupd-metadata", NULL);
+	else
+		fw_path = g_build_filename("/etc/pki/fwupd-metadata", NULL);
+	if (!fu_keyring_add_public_keys (kr, fw_path, error))
 		return FALSE;
 	if (!fu_keyring_verify_data (kr, bytes_raw, bytes_sig, error))
 		return FALSE;
@@ -1122,7 +1139,12 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 
 	/* save the new file */
 	as_store_set_api_version (priv->store, 0.9);
-	file = g_file_new_for_path ("/var/cache/app-info/xmls/fwupd.xml");
+	if (get_snap_app_data_path()) {
+		xml_path = g_build_filename (get_snap_app_data_path(), "/var/cache/app-info/xmls/fwupd.xml", NULL);
+		file = g_file_new_for_path (xml_path);
+	} else {
+		file = g_file_new_for_path ("/var/cache/app-info/xmls/fwupd.xml");
+	}
 	if (!as_store_to_file (priv->store, file,
 			       AS_NODE_TO_XML_FLAG_ADD_HEADER |
 			       AS_NODE_TO_XML_FLAG_FORMAT_MULTILINE |
@@ -2290,6 +2312,8 @@ main (int argc, char *argv[])
 	priv->loop = g_main_loop_new (NULL, FALSE);
 	priv->pending = fu_pending_new ();
 	priv->store = as_store_new ();
+	if (get_snap_app_data_path())
+		as_store_set_destdir(priv->store, get_snap_app_data_path());
 	priv->profile = as_profile_new ();
 	g_signal_connect (priv->store, "changed",
 			  G_CALLBACK (fu_main_store_changed_cb), priv);
@@ -2308,7 +2332,7 @@ main (int argc, char *argv[])
 	/* load AppStream */
 	as_store_add_filter (priv->store, AS_APP_KIND_FIRMWARE);
 	if (!as_store_load (priv->store,
-			    AS_STORE_LOAD_FLAG_APP_INFO_SYSTEM,
+			    AS_STORE_LOAD_FLAG_APP_INFO_SYSTEM | AS_STORE_LOAD_FLAG_APP_INSTALL,
 			    NULL, &error)){
 		g_warning ("FuMain: failed to load AppStream data: %s",
 			   error->message);
@@ -2317,7 +2341,10 @@ main (int argc, char *argv[])
 
 	/* read config file */
 	config = g_key_file_new ();
-	config_file = g_build_filename (SYSCONFDIR, "fwupd.conf", NULL);
+	if (get_snap_app_data_path())
+		config_file = g_build_filename (get_snap_app_data_path(), SYSCONFDIR, "fwupd.conf", NULL);
+	else
+		config_file = g_build_filename (SYSCONFDIR, "fwupd.conf", NULL);
 	g_debug ("Loading fallback values from %s", config_file);
 	if (!g_key_file_load_from_file (config, config_file,
 					G_KEY_FILE_NONE, &error)) {
