@@ -697,7 +697,7 @@ _fwup_resource_iter_free (fwup_resource_iter *iter)
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(fwup_resource_iter, _fwup_resource_iter_free);
 
 /**
- * fu_provider_dell_update:
+ * fu_provider_dell_unlock:
  **/
 static gboolean
 fu_provider_dell_unlock(FuProvider *provider,
