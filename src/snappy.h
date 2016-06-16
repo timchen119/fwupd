@@ -29,7 +29,7 @@ static const char* get_snap_app_data_path()
         static char *path = NULL;
 
         if (!path)
-                path = getenv("SNAP_APP_DATA_PATH");
+                path = getenv("SNAP");
 
         return path;
 }
@@ -39,7 +39,7 @@ static const char* get_snap_app_path()
         static char *path = NULL;
 
                         if (!path)
-                                path = getenv("SNAP_APP_PATH");
+                                path = getenv("SNAP");
 
                         return path;
 }
