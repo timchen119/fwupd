@@ -264,8 +264,8 @@ fu_main_load_plugins (GHashTable *plugins, GError **error)
 	g_autoptr(GList) values = NULL;
 
 	/* search */
-	if (get_snap_app_data_path())
-		plugin_dir = g_build_filename (get_snap_app_data_path(), LIBDIR, "fwupd-plugins-1", NULL);
+	if (get_snap_app_path())
+		plugin_dir = g_build_filename (get_snap_app_path(), LIBDIR, "fwupd-plugins-1", NULL);
 	else
 		plugin_dir = g_build_filename (LIBDIR, "fwupd-plugins-1", NULL);
 	dir = g_dir_open (plugin_dir, 0, error);
@@ -435,8 +435,8 @@ fu_main_get_release_trust_flags (AsRelease *release,
 	}
 
 	/* check we were installed correctly */
-	if (get_snap_app_data_path())
-		pki_dir = g_build_filename(get_snap_app_data_path(), SYSCONFDIR, "pki", "fwupd", NULL);
+	if (get_snap_app_path())
+		pki_dir = g_build_filename(get_snap_app_path(), SYSCONFDIR, "pki", "fwupd", NULL);
 	else
 		pki_dir = g_build_filename (SYSCONFDIR, "pki", "fwupd", NULL);
 	if (!g_file_test (pki_dir, G_FILE_TEST_EXISTS)) {
@@ -1113,8 +1113,8 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 
 	/* verify file */
 	kr = fu_keyring_new ();
-	if (get_snap_app_data_path())
-		fw_path = g_build_filename(get_snap_app_data_path(), "/etc/pki/fwupd-metadata", NULL);
+	if (get_snap_app_path())
+		fw_path = g_build_filename(get_snap_app_path(), "/etc/pki/fwupd-metadata", NULL);
 	else
 		fw_path = g_build_filename("/etc/pki/fwupd-metadata", NULL);
 	if (!fu_keyring_add_public_keys (kr, fw_path, error))
@@ -2341,8 +2341,8 @@ main (int argc, char *argv[])
 
 	/* read config file */
 	config = g_key_file_new ();
-	if (get_snap_app_data_path())
-		config_file = g_build_filename (get_snap_app_data_path(), SYSCONFDIR, "fwupd.conf", NULL);
+	if (get_snap_app_path())
+		config_file = g_build_filename (get_snap_app_path(), SYSCONFDIR, "fwupd.conf", NULL);
 	else
 		config_file = g_build_filename (SYSCONFDIR, "fwupd.conf", NULL);
 	g_debug ("Loading fallback values from %s", config_file);
