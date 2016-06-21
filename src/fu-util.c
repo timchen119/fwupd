@@ -736,6 +736,19 @@ fu_util_download_file (FuUtilPrivate *priv,
 	
 	g_print ("fu_util_download_file_4\n");
 	
+	name = soup_message_get_uri (msg)->path
+
+		if (msg->status_code == SOUP_STATUS_SSL_FAILED) {
+                        GTlsCertificateFlags flags;
+
+                        if (soup_message_get_https_status (msg, NULL, &flags))
+                                g_print ("%s: %d %s (0x%x)\n", name, msg->status_code, msg->reason_phrase, flags);
+                        else
+                                g_print ("%s: %d %s (no handshake status)\n", name, msg->status_code, msg->reason_phrase);
+                } else if (!quiet || SOUP_STATUS_IS_TRANSPORT_ERROR (msg->status_code))
+                        g_print ("%s: %d %s\n", name, msg->status_code, msg->reason_phrase);
+
+	
 	if (status_code != SOUP_STATUS_OK) {
 		g_print ("fu_util_download_file_5\n");
 		g_set_error (error,
