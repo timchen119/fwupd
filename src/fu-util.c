@@ -745,7 +745,7 @@ fu_util_download_file (FuUtilPrivate *priv,
                                 g_print ("%s: %d %s (0x%x)\n", name, msg->status_code, msg->reason_phrase, flags);
                         else
                                 g_print ("%s: %d %s (no handshake status)\n", name, msg->status_code, msg->reason_phrase);
-                } else if (!quiet || SOUP_STATUS_IS_TRANSPORT_ERROR (msg->status_code))
+                } else if (SOUP_STATUS_IS_TRANSPORT_ERROR (msg->status_code))
                         g_print ("%s: %d %s\n", name, msg->status_code, msg->reason_phrase);
 
 	
