@@ -703,6 +703,7 @@ fu_util_download_file (FuUtilPrivate *priv,
 	g_autofree gchar *user_agent = NULL;
 	g_autoptr(SoupMessage) msg = NULL;
 	g_autoptr(SoupSession) session = NULL;
+	const char *name;
 	
 	g_print ("fu_util_download_file_0\n");
 
