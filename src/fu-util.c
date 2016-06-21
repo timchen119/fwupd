@@ -722,7 +722,7 @@ fu_util_download_file (FuUtilPrivate *priv,
 	g_print ("fu_util_download_file_2\n");
 
 	/* download data */
-	g_debug ("downloading %s to %s:", uri, fn);
+	g_print ("downloading %s to %s:", uri, fn);
 	msg = soup_message_new (SOUP_METHOD_GET, uri);
 	status_code = soup_session_send_message (session, msg);
 	if (status_code != SOUP_STATUS_OK) {
