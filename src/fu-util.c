@@ -699,6 +699,8 @@ fu_util_download_file (FuUtilPrivate *priv,
 	g_autofree gchar *user_agent = NULL;
 	g_autoptr(SoupMessage) msg = NULL;
 	g_autoptr(SoupSession) session = NULL;
+	
+	g_print ("fu_util_download_file_0");
 
 	user_agent = g_strdup_printf ("%s/%s", PACKAGE_NAME, PACKAGE_VERSION);
 	session = soup_session_new_with_options (SOUP_SESSION_USER_AGENT,
@@ -711,6 +713,8 @@ fu_util_download_file (FuUtilPrivate *priv,
 				     "%s: failed to setup networking");
 		return FALSE;
 	}
+	
+	g_print ("fu_util_download_file_1");
 
 	/* this disables the double-compression of the firmware.xml.gz file */
 	soup_session_remove_feature_by_type (session, SOUP_TYPE_CONTENT_DECODER);
@@ -783,6 +787,8 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 	g_autofree gchar *sig_fn = NULL;
 	g_autofree gchar *sig_uri = NULL;
 	g_autoptr(GKeyFile) config = NULL;
+	
+	g_print("test_download_metadata_0");
 
 	/* read config file */
 	config = g_key_file_new ();
@@ -803,6 +809,8 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 	if (!fu_util_mkdir_with_parents (cache_dir, error))
 		return FALSE;
 
+	g_print("test_download_metadata_1");
+
 	/* download the signature */
 	data_uri = g_key_file_get_string (config, "fwupd", "DownloadURI", error);
 	if (data_uri == NULL)
@@ -810,8 +818,11 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 	sig_uri = g_strdup_printf ("%s.asc", data_uri);
 	data_fn = g_build_filename (cache_dir, "firmware.xml.gz", NULL);
 	sig_fn = g_strdup_printf ("%s.asc", data_fn);
+	g_print("test_download_metadata_2");
 	if (!fu_util_download_file (priv, sig_uri, sig_fn, NULL, 0, error))
 		return FALSE;
+		
+	g_print("test_download_metadata_3");
 
 	/* download the payload */
 	if (!fu_util_download_file (priv, data_uri, data_fn, NULL, 0, error))
