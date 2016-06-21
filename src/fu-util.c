@@ -737,7 +737,7 @@ fu_util_download_file (FuUtilPrivate *priv,
 	g_print ("fu_util_download_file_4\n");
 	
 	if (status_code != SOUP_STATUS_OK) {
-		g_print ("fu_util_download_file_5\n")
+		g_print ("fu_util_download_file_5\n");
 		g_set_error (error,
 			     FWUPD_ERROR,
 			     FWUPD_ERROR_INVALID_FILE,
