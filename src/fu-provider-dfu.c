@@ -159,7 +159,8 @@ fu_provider_dfu_device_added_cb (DfuContext *ctx,
 	fu_provider_dfu_device_update (provider_dfu, dev, device);
 
 	/* open device to get display name */
-	if (!dfu_device_open (device, DFU_DEVICE_OPEN_FLAG_NONE, NULL, &error)) {
+	if (!dfu_device_open (device, DFU_DEVICE_OPEN_FLAG_NO_AUTO_REFRESH,
+			      NULL, &error)) {
 		g_warning ("Failed to open DFU device: %s", error->message);
 		return;
 	}
@@ -378,7 +379,7 @@ fu_provider_dfu_verify (FuProvider *provider,
 	checksum_type = fu_provider_get_checksum_type (flags);
 	hash = g_compute_checksum_for_bytes (checksum_type, blob_fw);
 	fu_device_set_checksum (dev, hash);
-	fu_device_set_checksum_kind (device, checksum_type);
+	fu_device_set_checksum_kind (dev, checksum_type);
 	fu_provider_set_status (provider, FWUPD_STATUS_IDLE);
 	return TRUE;
 }
