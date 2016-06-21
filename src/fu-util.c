@@ -700,7 +700,7 @@ fu_util_download_file (FuUtilPrivate *priv,
 	g_autoptr(SoupMessage) msg = NULL;
 	g_autoptr(SoupSession) session = NULL;
 	
-	g_print ("fu_util_download_file_0");
+	g_print ("fu_util_download_file_0\n");
 
 	user_agent = g_strdup_printf ("%s/%s", PACKAGE_NAME, PACKAGE_VERSION);
 	session = soup_session_new_with_options (SOUP_SESSION_USER_AGENT,
@@ -714,10 +714,12 @@ fu_util_download_file (FuUtilPrivate *priv,
 		return FALSE;
 	}
 	
-	g_print ("fu_util_download_file_1");
+	g_print ("fu_util_download_file_1\n");
 
 	/* this disables the double-compression of the firmware.xml.gz file */
 	soup_session_remove_feature_by_type (session, SOUP_TYPE_CONTENT_DECODER);
+
+	g_print ("fu_util_download_file_2\n");
 
 	/* download data */
 	g_debug ("downloading %s to %s:", uri, fn);
@@ -731,6 +733,9 @@ fu_util_download_file (FuUtilPrivate *priv,
 			     uri, soup_status_get_phrase (status_code));
 		return FALSE;
 	}
+
+	g_print ("fu_util_download_file_3\n");
+
 
 	/* verify checksum */
 	if (checksum_expected != NULL) {
@@ -747,6 +752,8 @@ fu_util_download_file (FuUtilPrivate *priv,
 		}
 	}
 
+	g_print ("fu_util_download_file_4\n");
+
 	/* save file */
 	if (!g_file_set_contents (fn,
 				  msg->response_body->data,
@@ -759,6 +766,8 @@ fu_util_download_file (FuUtilPrivate *priv,
 			     error_local->message);
 		return FALSE;
 	}
+	
+	g_print ("fu_util_download_file_5\n");
 	return TRUE;
 }
 
@@ -788,7 +797,7 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 	g_autofree gchar *sig_uri = NULL;
 	g_autoptr(GKeyFile) config = NULL;
 	
-	g_print("test_download_metadata_0");
+	g_print("test_download_metadata_0\n");
 
 	/* read config file */
 	config = g_key_file_new ();
@@ -809,7 +818,7 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 	if (!fu_util_mkdir_with_parents (cache_dir, error))
 		return FALSE;
 
-	g_print("test_download_metadata_1");
+	g_print("test_download_metadata_1\n");
 
 	/* download the signature */
 	data_uri = g_key_file_get_string (config, "fwupd", "DownloadURI", error);
@@ -818,15 +827,17 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 	sig_uri = g_strdup_printf ("%s.asc", data_uri);
 	data_fn = g_build_filename (cache_dir, "firmware.xml.gz", NULL);
 	sig_fn = g_strdup_printf ("%s.asc", data_fn);
-	g_print("test_download_metadata_2");
+	g_print("test_download_metadata_2\n");
 	if (!fu_util_download_file (priv, sig_uri, sig_fn, NULL, 0, error))
 		return FALSE;
 		
-	g_print("test_download_metadata_3");
+	g_print("test_download_metadata_3\n");
 
 	/* download the payload */
 	if (!fu_util_download_file (priv, data_uri, data_fn, NULL, 0, error))
 		return FALSE;
+		
+	g_print("test_download_metadata_4\n");
 
 	/* send all this to fwupd */
 	return fwupd_client_update_metadata (priv->client, data_fn, sig_fn, NULL, error);
