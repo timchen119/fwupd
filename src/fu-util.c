@@ -709,6 +709,8 @@ fu_util_download_file (FuUtilPrivate *priv,
 	user_agent = g_strdup_printf ("%s/%s", PACKAGE_NAME, PACKAGE_VERSION);
 	session = soup_session_new_with_options (SOUP_SESSION_USER_AGENT,
 						 user_agent,
+						 SOUP_SESSION_SSL_CA_FILE,
+						 "/etc/ssl/certs/ca-certificates.crt",
 						 NULL);
 	if (session == NULL) {
 		g_set_error_literal (error,
@@ -728,8 +730,14 @@ fu_util_download_file (FuUtilPrivate *priv,
 	/* download data */
 	g_print ("downloading %s to %s:", uri, fn);
 	msg = soup_message_new (SOUP_METHOD_GET, uri);
+	
+	g_print ("fu_util_download_file_3\n");
 	status_code = soup_session_send_message (session, msg);
+	
+	g_print ("fu_util_download_file_4\n");
+	
 	if (status_code != SOUP_STATUS_OK) {
+		g_print ("fu_util_download_file_5\n")
 		g_set_error (error,
 			     FWUPD_ERROR,
 			     FWUPD_ERROR_INVALID_FILE,
