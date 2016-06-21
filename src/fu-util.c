@@ -736,7 +736,7 @@ fu_util_download_file (FuUtilPrivate *priv,
 	
 	g_print ("fu_util_download_file_4\n");
 	
-	name = soup_message_get_uri (msg)->path
+	name = soup_message_get_uri (msg)->path;
 
 		if (msg->status_code == SOUP_STATUS_SSL_FAILED) {
                         GTlsCertificateFlags flags;
