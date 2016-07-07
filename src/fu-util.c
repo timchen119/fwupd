@@ -675,7 +675,16 @@ fu_util_verify_update_all (FuUtilPrivate *priv, const gchar *fn, GError **error)
 static gboolean
 fu_util_verify_update (FuUtilPrivate *priv, gchar **values, GError **error)
 {
-	const gchar *fn = "/var/cache/app-info/xmls/fwupd-verify.xml";
+	//const gchar *fn = "/var/cache/app-info/xmls/fwupd-verify.xml";
+
+	g_autofree gchar *fn = NULL;
+
+        if (get_snap_app_data_path()) {
+                fn = g_build_filename(get_snap_app_data_path(), "/var/cache/app-info/xmls/fwupd.xml", NULL);
+        } else {
+                fn = "/var/cache/app-info/xmls/fwupd-verify.xml";
+        }
+
 	if (g_strv_length (values) == 0)
 		return fu_util_verify_update_all (priv, fn, error);
 	if (g_strv_length (values) == 1)
