@@ -1140,7 +1140,7 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 	/* save the new file */
 	as_store_set_api_version (priv->store, 0.9);
 	if (get_snap_app_data_path()) {
-		xml_path = g_build_filename (get_snap_app_data_path(), "/var/cache/app-info/xmls/fwupd.xml", NULL);
+		xml_path = g_build_filename (get_snap_app_data_path(), "/cache/app-info/xmls/fwupd.xml", NULL);
 		file = g_file_new_for_path (xml_path);
 	} else {
 		file = g_file_new_for_path ("/var/cache/app-info/xmls/fwupd.xml");

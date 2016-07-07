@@ -680,7 +680,7 @@ fu_util_verify_update (FuUtilPrivate *priv, gchar **values, GError **error)
 	g_autofree gchar *fn = NULL;
 
         if (get_snap_app_data_path()) {
-                fn = g_build_filename(get_snap_app_data_path(), "/var/cache/app-info/xmls/fwupd.xml", NULL);
+                fn = g_build_filename(get_snap_app_data_path(), "/cache/app-info/xmls/fwupd.xml", NULL);
         } else {
                 fn = "/var/cache/app-info/xmls/fwupd-verify.xml";
         }
