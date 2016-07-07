@@ -1080,7 +1080,7 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 	stream_buf = g_memory_input_stream_new ();
 	g_memory_input_stream_add_bytes (G_MEMORY_INPUT_STREAM (stream_buf), bytes_raw);
 
-	g_printf ("fu_main_daemon_update_metadata 1");
+	g_warning ("fu_main_daemon_update_metadata 1");
 
 	/* peek the file type and get data */
 	data = g_bytes_get_data (bytes_raw, &size);
@@ -1092,14 +1092,14 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 		return FALSE;
 	}
 	if (data[0] == 0x1f && data[1] == 0x8b) {
-		g_printf ("using GZip decompressor for data");
+		g_warning ("using GZip decompressor for data");
 		converter = G_CONVERTER (g_zlib_decompressor_new (G_ZLIB_COMPRESSOR_FORMAT_GZIP));
 		stream = g_converter_input_stream_new (stream_buf, converter);
 		bytes = g_input_stream_read_bytes (stream, 0x100000, NULL, error);
 		if (bytes == NULL)
 			return FALSE;
 	} else if (data[0] == '<' && data[1] == '?') {
-		g_printf ("using no decompressor for data");
+		g_warning ("using no decompressor for data");
 		bytes = g_bytes_ref (bytes_raw);
 	} else {
 		g_set_error (error,
@@ -1110,7 +1110,7 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 		return FALSE;
 	}
 	
-	g_printf ("fu_main_daemon_update_metadata 2");
+	g_warning ("fu_main_daemon_update_metadata 2");
 
 	/* read signature */
 	stream_sig = g_unix_input_stream_new (fd_sig, TRUE);
@@ -1160,7 +1160,7 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 		return FALSE;
 	}
 	
-	g_printf ("fu_main_daemon_update_metadata 3");
+	g_warning ("fu_main_daemon_update_metadata 3");
 
 	return TRUE;
 }
