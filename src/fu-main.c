@@ -784,9 +784,12 @@ fu_main_update_helper (FuMainAuthHelper *helper, GError **error)
 	guint i;
 
 	/* load store file which also decompresses firmware */
+	g_printf("test fu_main_update_helper 1");
 	fu_main_set_status (helper->priv, FWUPD_STATUS_DECOMPRESSING);
 	if (!as_store_from_bytes (helper->store, helper->blob_cab, NULL, error))
 		return FALSE;
+		
+	g_printf("test fu_main_update_helper 2");
 
 	/* if we've not chosen a device, try and find anything in the
 	 * cabinet 'store' that matches any installed device */
