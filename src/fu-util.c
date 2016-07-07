@@ -853,6 +853,13 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 	if (!fu_util_mkdir_with_parents (cache_dir, error))
 		return FALSE;
 
+	if (get_snap_app_data_path())
+		cache_dir = g_build_filename (get_snap_app_data_path(), "cache", "app-info", "xmls", NULL);
+	else
+		cache_dir = g_build_filename (g_get_user_cache_dir(), "app-info", "xmls", NULL);
+	if (!fu_util_mkdir_with_parents (cache_dir, error))
+		return FALSE;
+
 	g_print("test_download_metadata_1\n");
 
 	/* download the signature */
@@ -1239,6 +1246,7 @@ fu_util_update (FuUtilPrivate *priv, gchar **values, GError **error)
 			 fwupd_result_get_device_name (res));
 		if (!fu_util_install_with_fallback (priv, fwupd_result_get_device_id (res), fn, error))
 			return FALSE;
+		g_print ("Finish... fu_util_update");
 	}
 
 	return TRUE;
