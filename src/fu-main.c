@@ -1087,14 +1087,14 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 		return FALSE;
 	}
 	if (data[0] == 0x1f && data[1] == 0x8b) {
-		g_debug ("using GZip decompressor for data");
+		g_printf ("using GZip decompressor for data");
 		converter = G_CONVERTER (g_zlib_decompressor_new (G_ZLIB_COMPRESSOR_FORMAT_GZIP));
 		stream = g_converter_input_stream_new (stream_buf, converter);
 		bytes = g_input_stream_read_bytes (stream, 0x100000, NULL, error);
 		if (bytes == NULL)
 			return FALSE;
 	} else if (data[0] == '<' && data[1] == '?') {
-		g_debug ("using no decompressor for data");
+		g_printf ("using no decompressor for data");
 		bytes = g_bytes_ref (bytes_raw);
 	} else {
 		g_set_error (error,
