@@ -1080,6 +1080,8 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 	stream_buf = g_memory_input_stream_new ();
 	g_memory_input_stream_add_bytes (G_MEMORY_INPUT_STREAM (stream_buf), bytes_raw);
 
+	g_printf ("fu_main_daemon_update_metadata 1");
+
 	/* peek the file type and get data */
 	data = g_bytes_get_data (bytes_raw, &size);
 	if (size < 2) {
@@ -1107,6 +1109,8 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 			     data[0], data[1]);
 		return FALSE;
 	}
+	
+	g_printf ("fu_main_daemon_update_metadata 2");
 
 	/* read signature */
 	stream_sig = g_unix_input_stream_new (fd_sig, TRUE);
@@ -1155,6 +1159,8 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 			       NULL, error)) {
 		return FALSE;
 	}
+	
+	g_printf ("fu_main_daemon_update_metadata 3");
 
 	return TRUE;
 }
