@@ -40,6 +40,8 @@
 #include "fu-provider.h"
 #include "fu-rom.h"
 
+#include "snappy.h"
+
 #ifndef GUdevClient_autoptr
 G_DEFINE_AUTOPTR_CLEANUP_FUNC(GUdevClient, g_object_unref)
 #endif
@@ -731,14 +733,20 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 
 	/* read config file */
 	config = g_key_file_new ();
-	config_fn = g_build_filename (SYSCONFDIR, "fwupd.conf", NULL);
+	if (get_snap_app_data_path())
+		config_fn = g_build_filename (get_snap_app_data_path(), SYSCONFDIR, "fwupd.conf", NULL);
+	else
+		config_fn = g_build_filename (SYSCONFDIR, "fwupd.conf", NULL);
 	if (!g_key_file_load_from_file (config, config_fn, G_KEY_FILE_NONE, error)) {
 		g_prefix_error (error, "Failed to load %s: ", config_fn);
 		return FALSE;
 	}
 
 	/* ensure cache directory exists */
-	cache_dir = g_build_filename (g_get_user_cache_dir (), "fwupdmgr", NULL);
+	if (get_snap_app_data_path())
+		cache_dir = g_build_filename (get_snap_app_data_path(), "cache", "fwupdmgr", NULL);
+	else
+		cache_dir = g_build_filename (g_get_user_cache_dir(), "fwupdmgr", NULL);
 	if (!fu_util_mkdir_with_parents (cache_dir, error))
 		return FALSE;
 

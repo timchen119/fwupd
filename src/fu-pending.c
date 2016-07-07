@@ -29,6 +29,8 @@
 
 #include "fu-pending.h"
 
+#include "snappy.h"
+
 static void fu_pending_finalize			 (GObject *object);
 
 typedef struct {
@@ -53,7 +55,10 @@ fu_pending_load (FuPending *pending, GError **error)
 	g_return_val_if_fail (priv->db == NULL, FALSE);
 
 	/* create directory */
-	dirname = g_build_filename (LOCALSTATEDIR, "lib", "fwupd", NULL);
+	if (get_snap_app_data_path())
+		dirname = g_build_filename (get_snap_app_data_path(), LOCALSTATEDIR, "lib", "fwupd", NULL);
+	else
+		dirname = g_build_filename (LOCALSTATEDIR, "lib", "fwupd", NULL);
 	file = g_file_new_for_path (dirname);
 	if (!g_file_query_exists (file, NULL)) {
 		if (!g_file_make_directory_with_parents (file, NULL, error))
