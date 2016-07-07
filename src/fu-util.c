@@ -627,7 +627,14 @@ fu_util_verify_update_all (FuUtilPrivate *priv, const gchar *fn, GError **error)
 static gboolean
 fu_util_verify_update (FuUtilPrivate *priv, gchar **values, GError **error)
 {
-	const gchar *fn = "/var/cache/app-info/xmls/fwupd-verify.xml";
+       g_autofree gchar *fn = NULL;
+
+        if (get_snap_app_data_path()) {
+                fn = g_build_filename(get_snap_app_data_path(), "/cache/app-info/xmls/fwupd.xml", NULL);
+        } else {
+                fn = g_build_filename("/var/cache/app-info/xmls/fwupd-verify.xml", NULL);
+        }
+	
 	if (g_strv_length (values) == 0)
 		return fu_util_verify_update_all (priv, fn, error);
 	if (g_strv_length (values) == 1)
@@ -656,6 +663,8 @@ fu_util_download_file (FuUtilPrivate *priv,
 	user_agent = g_strdup_printf ("%s/%s", PACKAGE_NAME, PACKAGE_VERSION);
 	session = soup_session_new_with_options (SOUP_SESSION_USER_AGENT,
 						 user_agent,
+						 SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE,
+						 TRUE,
 						 NULL);
 	if (session == NULL) {
 		g_set_error_literal (error,
@@ -749,6 +758,13 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 		cache_dir = g_build_filename (g_get_user_cache_dir(), "fwupdmgr", NULL);
 	if (!fu_util_mkdir_with_parents (cache_dir, error))
 		return FALSE;
+
+        if (get_snap_app_data_path())
+                cache_dir = g_build_filename (get_snap_app_data_path(), "cache", "app-info", "xmls", NULL);
+        else
+                cache_dir = g_build_filename (g_get_user_cache_dir(), "app-info", "xmls", NULL);
+        if (!fu_util_mkdir_with_parents (cache_dir, error))
+                return FALSE;
 
 	/* download the signature */
 	data_uri = g_key_file_get_string (config, "fwupd", "DownloadURI", error);
