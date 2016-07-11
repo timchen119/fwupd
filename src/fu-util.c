@@ -742,7 +742,7 @@ fu_util_download_metadata (FuUtilPrivate *priv, GError **error)
 
 	/* read config file */
 	config = g_key_file_new ();
-	if (get_snap_app_data_path())
+	if (get_snap_app_path())
 		config_fn = g_build_filename (get_snap_app_path(), SYSCONFDIR, "fwupd.conf", NULL);
 	else
 		config_fn = g_build_filename (SYSCONFDIR, "fwupd.conf", NULL);

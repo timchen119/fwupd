@@ -390,8 +390,8 @@ fu_main_get_release_trust_flags (AsRelease *release,
 	}
 
 	/* check we were installed correctly */
-	if (get_snap_app_data_path())
-		pki_dir = g_build_filename(get_snap_app_data_path(), SYSCONFDIR, "pki", "fwupd", NULL);
+	if (get_snap_app_path())
+		pki_dir = g_build_filename(get_snap_app_path(), SYSCONFDIR, "pki", "fwupd", NULL);
 	else
 		pki_dir = g_build_filename (SYSCONFDIR, "pki", "fwupd", NULL);
 	if (!g_file_test (pki_dir, G_FILE_TEST_EXISTS)) {
@@ -1128,8 +1128,8 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 
 	/* verify file */
 	kr = fu_keyring_new ();
-	if (get_snap_app_data_path())
-		fw_path = g_build_filename(get_snap_app_data_path(), "/etc/pki/fwupd-metadata", NULL);
+	if (get_snap_app_path())
+		fw_path = g_build_filename(get_snap_app_path(), "/etc/pki/fwupd-metadata", NULL);
 	else
 		fw_path = g_build_filename("/etc/pki/fwupd-metadata", NULL);
 	if (!fu_keyring_add_public_keys (kr, fw_path, error))
@@ -1155,7 +1155,7 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 	/* save the new file */
 	as_store_set_api_version (priv->store, 0.9);
 	if (get_snap_app_data_path()) {
-		xml_path = g_build_filename (get_snap_app_data_path(), "/var/cache/app-info/xmls/fwupd.xml", NULL);
+		xml_path = g_build_filename (get_snap_app_data_path(), "/cache/app-info/xmls/fwupd.xml", NULL);
 		file = g_file_new_for_path (xml_path);
 	} else {
 		file = g_file_new_for_path ("/var/cache/app-info/xmls/fwupd.xml");
