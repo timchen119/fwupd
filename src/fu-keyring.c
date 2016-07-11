@@ -25,6 +25,7 @@
 #include <gpgme.h>
 
 #include "fu-keyring.h"
+#include "snappy.h"
 
 static void fu_keyring_finalize			 (GObject *object);
 
