@@ -2379,8 +2379,8 @@ main (int argc, char *argv[])
 
 	/* read config file */
 	config = g_key_file_new ();
-	if (get_snap_app_data_path())
-		config_file = g_build_filename (get_snap_app_data_path(), SYSCONFDIR, "fwupd.conf", NULL);
+	if (get_snap_app_path())
+		config_file = g_build_filename (get_snap_app_path(), SYSCONFDIR, "fwupd.conf", NULL);
 	else
 		config_file = g_build_filename (SYSCONFDIR, "fwupd.conf", NULL);
 	g_debug ("Loading fallback values from %s", config_file);
