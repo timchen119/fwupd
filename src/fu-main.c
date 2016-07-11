@@ -1848,7 +1848,7 @@ fu_main_daemon_method_call (GDBusConnection *connection, const gchar *sender,
 
 		/* check the id exists */
 		g_variant_get (parameters, "(&sha{sv})", &id, &fd_handle, &iter);
-		g_debug ("Called %s(%s,%i)", method_name, id, fd_handle);
+		g_warning ("Called %s(%s,%i)", method_name, id, fd_handle);
 		if (g_strcmp0 (id, FWUPD_DEVICE_ID_ANY) != 0) {
 			item = fu_main_get_item_by_id (priv, id);
 			if (item == NULL) {
@@ -1864,7 +1864,7 @@ fu_main_daemon_method_call (GDBusConnection *connection, const gchar *sender,
 		/* get options */
 		while (g_variant_iter_next (iter, "{&sv}",
 					    &prop_key, &prop_value)) {
-			g_debug ("got option %s", prop_key);
+			g_warning ("got option %s", prop_key);
 			if (g_strcmp0 (prop_key, "offline") == 0 &&
 			    g_variant_get_boolean (prop_value) == TRUE)
 				flags |= FWUPD_INSTALL_FLAG_OFFLINE;
@@ -1909,6 +1909,7 @@ fu_main_daemon_method_call (GDBusConnection *connection, const gchar *sender,
 		}
 
 		/* process the firmware */
+		g_warning ("I have the firmware1");
 		helper = g_new0 (FuMainAuthHelper, 1);
 		helper->auth_kind = FU_MAIN_AUTH_KIND_INSTALL;
 		helper->invocation = g_object_ref (invocation);
@@ -1928,6 +1929,8 @@ fu_main_daemon_method_call (GDBusConnection *connection, const gchar *sender,
 			fu_main_helper_free (helper);
 			return;
 		}
+		g_warning ("I have the firmware2");
+
 
 		/* is root */
 		if (fu_main_dbus_get_uid (priv, sender) == 0) {
