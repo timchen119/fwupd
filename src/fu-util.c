@@ -661,7 +661,7 @@ fu_util_download_file (FuUtilPrivate *priv,
 	g_autoptr(SoupSession) session = NULL;
 
 	user_agent = g_strdup_printf ("%s/%s", PACKAGE_NAME, PACKAGE_VERSION);
-	session = soup_session_new_with_options (SOUP_SESSION_USER_AGENT,
+	session = soup_session_sync_new_with_options (SOUP_SESSION_USER_AGENT,
 						 user_agent,
 						 SOUP_SESSION_SSL_USE_SYSTEM_CA_FILE,
 						 TRUE,
