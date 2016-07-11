@@ -237,8 +237,8 @@ fu_main_load_plugins (GHashTable *plugins, GError **error)
 	g_autoptr(GList) values = NULL;
 
 	/* search */
-	if (get_snap_app_data_path())
-		plugin_dir = g_build_filename (get_snap_app_data_path(), LIBDIR, "fwupd-plugins-1", NULL);
+	if (get_snap_app_path())
+		plugin_dir = g_build_filename (get_snap_app_path(), LIBDIR, "fwupd-plugins-1", NULL);
 	else
 		plugin_dir = g_build_filename (LIBDIR, "fwupd-plugins-1", NULL);
 	dir = g_dir_open (plugin_dir, 0, error);
