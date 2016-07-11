@@ -858,8 +858,10 @@ fu_main_update_helper (FuMainAuthHelper *helper, GError **error)
 
 	/* load store file which also decompresses firmware */
 	fu_main_set_status (helper->priv, FWUPD_STATUS_DECOMPRESSING);
+	g_warning ("fu_main_update_helper 1");
 	if (!as_store_from_bytes (helper->store, helper->blob_cab, NULL, error))
 		return FALSE;
+		g_warning ("fu_main_update_helper 2");		
 
 	/* we've specified a specific device; failure is critical */
 	if (helper->devices->len > 0) {
@@ -1141,8 +1143,10 @@ fu_main_daemon_update_metadata (FuMainPrivate *priv, gint fd, gint fd_sig, GErro
 	store = as_store_new ();
 	data = g_bytes_get_data (bytes, &size);
 	xml = g_strndup ((const gchar *) data, size);
+	g_warning ("111");
 	if (!as_store_from_xml (store, xml, NULL, error))
 		return FALSE;
+	g_warning ("222");
 
 	/* add the new application from the store */
 	as_store_remove_all (priv->store);
@@ -1385,6 +1389,7 @@ fu_main_get_store_from_fd (FuMainPrivate *priv, gint fd, GError **error)
 
 	/* load file */
 	store = as_store_new ();
+	g_warning ("3333");
 	if (!as_store_from_bytes (store, blob_cab, NULL, &error_local)) {
 		g_set_error_literal (error,
 				     FWUPD_ERROR,
@@ -1392,6 +1397,7 @@ fu_main_get_store_from_fd (FuMainPrivate *priv, gint fd, GError **error)
 				     error_local->message);
 		return NULL;
 	}
+	g_warning ("444");
 	return g_steal_pointer (&store);
 }
 
