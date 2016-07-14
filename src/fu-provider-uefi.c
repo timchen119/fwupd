@@ -203,7 +203,7 @@ fu_provider_uefi_update (FuProvider *provider,
 		return FALSE;
 
 	/* perform the update */
-	g_debug ("Performing UEFI capsule update");
+	g_warning ("Performing UEFI capsule update");
 	fu_provider_set_status (provider, FWUPD_STATUS_SCHEDULING);
 	rc = fwup_set_up_update_with_buf (re, hardware_instance,
 					  g_bytes_get_data (blob_fw, NULL),
