@@ -2366,9 +2366,9 @@ main (int argc, char *argv[])
 	else
 		config_file = g_build_filename (SYSCONFDIR, "fwupd.conf", NULL);
 
-	g_debug ("Loading fallback values from %s", priv->config_file);
+	g_debug ("Loading fallback values from %s", config_file);
 	priv->config = g_key_file_new ();
-	if (!g_key_file_load_from_file (config, config_file,
+	if (!g_key_file_load_from_file (priv->config, config_file,
 					G_KEY_FILE_NONE, &error)) {
 		g_print ("failed to load config file %s: %s\n",
 			  config_file, error->message);
