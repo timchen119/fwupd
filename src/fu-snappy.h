@@ -24,7 +24,7 @@
 
 #include <stdlib.h>
 
-static const char* get_snap_app_data_path()
+inline const char* get_snap_app_data_path(void)
 {
         static char *path = NULL;
 
@@ -34,7 +34,7 @@ static const char* get_snap_app_data_path()
         return path;
 }
 
-static const char* get_snap_app_path()
+inline const char* get_snap_app_path(void)
 {
         static char *path = NULL;
 
