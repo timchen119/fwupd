@@ -33,6 +33,7 @@
 #include "fu-pending.h"
 #include "fu-plugin.h"
 #include "fu-provider-uefi.h"
+#include "fu-snappy.h"
 
 static void	fu_provider_finalize	(GObject	*object);
 
@@ -126,7 +127,10 @@ fu_provider_schedule_update (FuProvider *provider,
 	}
 
 	/* create directory */
-	dirname = g_build_filename (LOCALSTATEDIR, "lib", "fwupd", NULL);
+	if (get_snap_app_data_path())
+		dirname = g_build_filename (get_snap_app_data_path(), LOCALSTATEDIR, "lib", "fwupd", NULL);
+	else
+		dirname = g_build_filename (LOCALSTATEDIR, "lib", "fwupd", NULL);
 	file = g_file_new_for_path (dirname);
 	if (!g_file_query_exists (file, NULL)) {
 		if (!g_file_make_directory_with_parents (file, NULL, error))

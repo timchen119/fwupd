@@ -25,6 +25,7 @@
 #include <gpgme.h>
 
 #include "fu-keyring.h"
+#include "fu-snappy.h"
 
 static void fu_keyring_finalize			 (GObject *object);
 
@@ -86,7 +87,14 @@ fu_keyring_setup (FuKeyring *keyring, GError **error)
 	}
 
 	/* set a custom home directory */
-	gpg_home = g_build_filename (LOCALSTATEDIR,
+	if (get_snap_app_data_path())
+		gpg_home = g_build_filename (get_snap_app_data_path(),
+				     "lib",
+				     PACKAGE_NAME,
+				     "gnupg",
+				     NULL);
+	else
+		gpg_home = g_build_filename (LOCALSTATEDIR,
 				     "lib",
 				     PACKAGE_NAME,
 				     "gnupg",
